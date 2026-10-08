@@ -1,3 +1,4 @@
+import { logger } from "../dx/logger";
 import type { Action } from "./store";
 
 export interface Command {
@@ -22,6 +23,7 @@ export const COMMANDS: Command[] = [
   { id: "ai-generate", title: "AI: Generate SQL from description", phase: "9", run: () => window.dispatchEvent(new CustomEvent("luminos:ai-generate")) },
   { id: "ai-explain", title: "AI: Explain current query", phase: "9", run: () => window.dispatchEvent(new CustomEvent("luminos:ai-explain")) },
   { id: "ai-error", title: "AI: Explain last error", phase: "9", run: () => window.dispatchEvent(new CustomEvent("luminos:ai-error")) },
+  { id: "logs", title: "Download logs", phase: "10", run: () => logger.download() },
 ];
 
 function setThemeFromPalette() {

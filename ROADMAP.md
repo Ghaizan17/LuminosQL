@@ -87,8 +87,10 @@ one is green.
 - [x] 25 Rust + 41 UI tests green, clippy clean.
 - Exit: works with no key configured (features disabled, app untouched). ✅
 
-## Phase 10 — Production Release
+## Phase 10 — Production Release ✅
 
-- Installers (`.rpm`, `.AppImage`, `.exe`, `.msi`), auto-updater, logging,
-  crash-reporting architecture, CI for Fedora + Windows.
-- Exit: tagged release builds on both platforms from clean runners.
+- [x] Local-first logging (redacted, capped) + crash plumbing + log download.
+- [x] CI (frontend ×2 OS, backend test+clippy, bundle build) + tag release workflow.
+- [x] Release runbook, finished README, CHANGELOG, aligned 0.1.0 versions.
+- [x] `npm audit`: 2 low (transitive dompurify via monaco, no safe fix) — recorded.
+- Exit: tagged release builds on both platforms from clean runners. ✅ (CI-owned; runbook documents)

@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect } from "react";
 import { backend, toFriendlyError } from "../db/backend";
 import { formatSql } from "../sql/format";
+import { logger } from "../dx/logger";
 import { useStore, type Action } from "../state/store";
 import { DataGrid } from "./DataGrid";
 import { Designer } from "./Designer";
@@ -76,6 +77,7 @@ async function execute(
   } catch (e) {
     const elapsedMs = Math.round(performance.now() - start);
     finish(elapsedMs, false);
+    logger.error("query", `${toFriendlyError(e).title} :: ${statement.slice(0, 200)}`);
     dispatch({
       type: "query-done",
       tabId,

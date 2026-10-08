@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parseCsv, toCsvRow } from "../src/dx/csv";
 import { record, search, toggleFavorite } from "../src/dx/history";
+import { redactSecrets } from "../src/dx/logger";
 import { buildPayload } from "../src/dx/workspace";
 import { snippetsFor } from "../src/sql/snippets";
 import { buildInsertInto, sqlLiteral } from "../src/db/sqlBuilder";
-import type { ShellState } from "../src/state/store";
 
 describe("history", () => {
   it("prepends, caps, and searches", () => {
@@ -60,5 +60,14 @@ describe("workspace payload", () => {
     expect(payload.connections).toHaveLength(1);
     expect(JSON.stringify(payload)).not.toContain("password");
     expect(payload.tabs).toEqual([{ title: "q.sql", content: "SELECT 1" }]);
+  });
+});
+
+describe("logger", () => {
+  it("redacts passwords, urls, and bearer tokens", () => {
+    expect(redactSecrets("password=hunter2 ok")).toBe("[redacted] ok");
+    expect(redactSecrets("postgres://admin:hunter2@host/db")).toContain("***:***@");
+    expect(redactSecrets("Bearer abc123XYZ ok")).toContain("[redacted]");
+    expect(redactSecrets("SELECT 1")).toBe("SELECT 1");
   });
 });
