@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { toFriendlyError } from "../src/db/backend";
+import { buildCreateTable, buildDropTable, buildRenameTable, buildSelectAll } from "../src/db/sqlBuilder";
 import { blankProfile } from "../src/db/types";
 import { COMMANDS, filterCommands } from "../src/state/commands";
 import { keywordProvider } from "../src/sql/completion";
 import { reducer } from "../src/state/store";
-import type { ShellState } from "../src/state/store";
 
 const base: ShellState = {
   theme: "dark",
@@ -22,6 +22,9 @@ const base: ShellState = {
   lastServerInfo: null,
   connDialog: null,
   storeOsBacked: null,
+  explorer: {},
+  expanded: {},
+  defs: {},
 };
 
 describe("command palette", () => {
@@ -104,5 +107,43 @@ describe("connection state", () => {
   it("backend errors normalize to friendly shape", () => {
     expect(toFriendlyError(new Error("nope")).title).toContain("nope");
     expect(toFriendlyError('{"title":"X","causes":[],"code":"c"}').code).toBe("c");
+  });
+});
+
+describe("explorer tree cache", () => {
+  const node = (key: string) => ({ key, label: key, kind: "schema" as const, connId: "c1", schema: "public" });
+
+  it("toggle / ready / drop-subtree round-trips", () => {
+    let s = reducer(base, { type: "tree-toggle", key: "conn:c1" });
+    expect(s.expanded["conn:c1"]).toBe(true);
+    s = reducer(s, { type: "tree-ready", key: "conn:c1", items: [node("schema:c1:public")] });
+    s = reducer(s, { type: "tree-ready", key: "schema:c1:public", items: [node("group-tables:c1:public")] });
+    s = reducer(s, { type: "tree-drop", match: ":c1:public" });
+    expect(s.explorer["schema:c1:public"]).toBeUndefined();
+    expect(s.explorer["group-tables:c1:public"]).toBeUndefined();
+    expect(s.explorer["conn:c1"]).toBeDefined();
+  });
+
+  it("loading then failure surfaces the friendly error", () => {
+    let s = reducer(base, { type: "tree-loading", key: "k" });
+    expect(s.explorer["k"].status).toBe("loading");
+    s = reducer(s, { type: "tree-failed", key: "k", error: { title: "X", causes: ["Y"], code: "c" } });
+    expect(s.explorer["k"].error?.causes).toEqual(["Y"]);
+  });
+});
+
+describe("sql builders", () => {
+  it("create table quotes per dialect and inlines single PK", () => {
+    const sql = buildCreateTable("postgres", "public", "users", [
+      { name: "id", dataType: "BIGINT", nullable: false, primaryKey: true, defaultValue: "" },
+      { name: "email", dataType: "TEXT", nullable: false, primaryKey: false, defaultValue: "" },
+    ]);
+    expect(sql).toContain('CREATE TABLE "public"."users"');
+    expect(sql).toContain('"id" BIGINT PRIMARY KEY');
+    expect(buildCreateTable("mysql", "app", "t", [])).toContain("CREATE TABLE `app`.`t`");
+    expect(buildCreateTable("sqlite", "main", "t", [])).toContain('CREATE TABLE "t"');
+    expect(buildRenameTable("postgres", "public", "a", "b")).toBe('ALTER TABLE "public"."a" RENAME TO "b";');
+    expect(buildDropTable("sqlite", "main", "t")).toBe('DROP TABLE "t";');
+    expect(buildSelectAll("mysql", "app", "t")).toBe("SELECT * FROM `app`.`t`;");
   });
 });

@@ -1,11 +1,13 @@
 //! `DatabaseAdapter` trait: every engine implements this, engine SQL stays inside.
-//! Phase 2 ships connect/ping/server-info. Phases 3–5 add schema/query methods.
+//! Phase 3 adds schema introspection; Phases 4–5 add query execution.
 
 use serde::Serialize;
 use std::time::Duration;
 
+pub mod ddl;
 pub mod mysql;
 pub mod postgres;
+pub mod schema;
 pub mod sqlite;
 
 /// What a successful connection test reports back to the UI.
@@ -48,4 +50,16 @@ pub trait DatabaseAdapter: Send + Sync {
     /// Close the connection. Idempotent.
     async fn disconnect(&mut self);
     fn is_connected(&self) -> bool;
+    /// Schema names visible to this connection (system schemas excluded,
+    /// except where the engine has no such concept).
+    async fn list_schemas(&self) -> Result<Vec<schema::SchemaInfo>, FriendlyError>;
+    /// Tables AND views of one schema, ordered by name.
+    async fn list_tables(&self, schema: &str) -> Result<Vec<schema::TableInfo>, FriendlyError>;
+    /// Full definition: columns, indexes, foreign keys.
+    async fn describe_table(&self, schema: &str, table: &str) -> Result<schema::TableDef, FriendlyError>;
+    /// Stored functions/procedures of one schema (empty where unsupported).
+    async fn list_functions(&self, schema: &str) -> Result<Vec<schema::FunctionInfo>, FriendlyError>;
+    /// Execute one DDL/DML statement. Returns rows affected.
+    /// The caller gates destructive statements (see `classify`).
+    async fn execute(&self, sql: &str) -> Result<u64, FriendlyError>;
 }

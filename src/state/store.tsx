@@ -1,5 +1,26 @@
 import { createContext, useContext, useReducer, type ReactNode } from "react";
-import type { ConnectionView, Engine, ServerInfo } from "../db/types";
+import type { ConnectionView, Engine, FriendlyError, ServerInfo, TableDef } from "../db/types";
+
+export type TreeKind =
+  | "schemas" | "schema" | "group-tables" | "group-views" | "group-funcs"
+  | "table" | "view" | "function" | "group-cols" | "col" | "group-idx" | "idx"
+  | "group-fk" | "fk";
+
+export interface TreeNode {
+  key: string;
+  label: string;
+  kind: TreeKind;
+  detail?: string;
+  connId: string;
+  schema?: string;
+  table?: string;
+}
+
+export interface NodeCache {
+  status: "loading" | "ready" | "error";
+  error?: FriendlyError;
+  items: TreeNode[];
+}
 
 export type Theme = "dark" | "light";
 export type ActivityView = "explorer" | "search" | "migrations" | "history" | "settings";
@@ -30,7 +51,13 @@ export interface ShellState {
   connDialog: { engine: Engine } | null;
   /** Null = unknown (not a desktop shell); true = OS keyring. */
   storeOsBacked: boolean | null;
+  /** Lazy explorer cache: node key → children. Missing = never loaded. */
+  explorer: Record<string, NodeCache>;
+  expanded: Record<string, true>;
+  /** describe_table results by `table:{conn}:{schema}:{table}` key. */
+  defs: Record<string, TableDef>;
 }
+
 const initial: ShellState = {
   theme:
     typeof localStorage === "undefined"
@@ -56,6 +83,9 @@ const initial: ShellState = {
   lastServerInfo: null,
   connDialog: null,
   storeOsBacked: null,
+  explorer: {},
+  expanded: {},
+  defs: {},
 };
 
 export type Action =
@@ -74,7 +104,13 @@ export type Action =
   | { type: "dialog-open"; engine: Engine }
   | { type: "dialog-close" }
   | { type: "connection-live"; id: string; info: ServerInfo }
-  | { type: "connection-dead"; id: string };
+  | { type: "connection-dead"; id: string }
+  | { type: "tree-toggle"; key: string }
+  | { type: "tree-loading"; key: string }
+  | { type: "tree-ready"; key: string; items: TreeNode[] }
+  | { type: "tree-failed"; key: string; error: FriendlyError }
+  | { type: "tree-def"; key: string; def: TableDef }
+  | { type: "tree-drop"; match: string };
 
 export function reducer(s: ShellState, a: Action): ShellState {
   switch (a.type) {
@@ -150,6 +186,29 @@ export function reducer(s: ShellState, a: Action): ShellState {
         activeConnectionId: s.activeConnectionId === a.id ? null : s.activeConnectionId,
         status: s.activeConnectionId === a.id ? { ...s.status, connection: "Not connected" } : s.status,
       };
+    case "tree-toggle": {
+      const expanded = { ...s.expanded };
+      if (expanded[a.key]) delete expanded[a.key];
+      else expanded[a.key] = true;
+      return { ...s, expanded };
+    }
+    case "tree-loading":
+      return { ...s, explorer: { ...s.explorer, [a.key]: { status: "loading", items: [] } } };
+    case "tree-ready":
+      return { ...s, explorer: { ...s.explorer, [a.key]: { status: "ready", items: a.items } } };
+    case "tree-failed":
+      return { ...s, explorer: { ...s.explorer, [a.key]: { status: "error", error: a.error, items: [] } } };
+    case "tree-def":
+      return { ...s, defs: { ...s.defs, [a.key]: a.def } };
+    case "tree-drop": {
+      // Substring match: keys embed `:{conn}:{schema}…` segments rather than nesting.
+      // May over-invalidate on name prefixes — harmless, children reload lazily.
+      const explorer = { ...s.explorer };
+      const defs = { ...s.defs };
+      for (const k of Object.keys(explorer)) if (k.includes(a.match)) delete explorer[k];
+      for (const k of Object.keys(defs)) if (k.includes(a.match)) delete defs[k];
+      return { ...s, explorer, defs };
+    }
   }
 }
 

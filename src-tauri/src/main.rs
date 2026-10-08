@@ -80,19 +80,60 @@ fn credential_store_status(state: State<'_, AppState>) -> Result<bool, String> {
     Ok(state.mgr.lock().map_err(|e| e.to_string())?.store_os_backed())
 }
 
-fn main() {
-    tauri::Builder::default()
-        .manage(AppState {
-            mgr: Mutex::new(ConnectionManager::new(AnyStore::auto())),
-        })
-        .invoke_handler(tauri::generate_handler![
-            create_connection,
-            list_connections,
-            connect,
-            disconnect,
-            delete_connection,
-            credential_store_status,
-        ])
-        .run(tauri::generate_context!())
-        .expect("failed to run LuminosQL");
+/// Pure classifier for the ⚠ Destructive Query modal — no backend needed.
+#[tauri::command]
+fn classify_statement(sql: String) -> bool {
+    luminosql_core::security::is_destructive(&sql)
 }
+
+#[tauri::command]
+async fn list_schemas(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Vec<luminosql_core::db::schema::SchemaInfo>, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.list_schemas(&id).await
+}
+
+#[tauri::command]
+async fn list_tables(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+) -> Result<Vec<luminosql_core::db::schema::TableInfo>, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.list_tables(&id, &schema).await
+}
+
+#[tauri::command]
+async fn describe_table(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+    table: String,
+) -> Result<luminosql_core::db::schema::TableDef, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.describe_table(&id, &schema, &table).await
+}
+
+#[tauri::command]
+async fn list_functions(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+) -> Result<Vec<luminosql_core::db::schema::FunctionInfo>, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.list_functions(&id, &schema).await
+}
+
+#[tauri::command]
+async fn table_ddl(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+    table: String,
+) -> Result<String, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.table_ddl(&id, &schema, &table).await
+}
+
+#[tauri::command]
+async fn execute_sql(state: State<'_, AppState>, id: String, sql: String) -> Result<u64, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.execute(&id, &sql).await
+}
+

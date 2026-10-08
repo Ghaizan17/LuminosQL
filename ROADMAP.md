@@ -27,11 +27,13 @@ one is green.
 - [x] 11 Rust tests (incl. live pg 18 + MariaDB 11 integration) + 4 new UI tests, clippy clean.
 - Exit: `cargo test` + `npm test` + `npm run build` green. ✅
 
-## Phase 3 — Database Explorer
+## Phase 3 — Database Explorer ✅
 
-- Schemas, tables, columns, indexes, FKs, views, functions; lazy loading.
-- Context menu: create/rename/delete/refresh/inspect/copy-SQL/open-data.
-- Exit: 1k-table schema browses without UI jank (lazy + cached metadata).
+- [x] Schemas, tables (+views), columns, indexes, FKs, functions on all engines.
+- [x] Lazy loading + per-node cache; 1,000-table schema lists in ~16 ms (measured live).
+- [x] Context menu: refresh / copy name / copy SELECT / view definition / new / rename / drop (modal-gated).
+- [x] 14 Rust tests + 17 UI tests green, clippy clean.
+- Exit: 1k-table schema browses without UI jank (lazy + cached). ✅
 
 ## Phase 4 — SQL Editor
 

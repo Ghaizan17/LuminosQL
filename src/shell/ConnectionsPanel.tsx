@@ -2,6 +2,7 @@ import { useState } from "react";
 import { backend, toFriendlyError } from "../db/backend";
 import type { FriendlyError } from "../db/types";
 import { useStore } from "../state/store";
+import { ExplorerTree } from "./ExplorerTree";
 
 export function ConnectionsPanel() {
   const { state, dispatch } = useStore();
@@ -91,6 +92,7 @@ export function ConnectionsPanel() {
                 ))}
               </div>
             )}
+            {v.live && <ExplorerTree connId={v.profile.id} engine={v.profile.engine} />}
           </div>
         ))}
       </div>

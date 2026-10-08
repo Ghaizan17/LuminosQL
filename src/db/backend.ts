@@ -6,7 +6,11 @@ import type {
   ConnectionProfile,
   ConnectionView,
   FriendlyError,
+  FunctionInfo,
+  SchemaInfo,
   ServerInfo,
+  TableDef,
+  TableInfo,
 } from "./types";
 
 declare global {
@@ -49,6 +53,27 @@ export const backend = {
   },
   credentialStoreStatus(): Promise<boolean> {
     return invoke("credential_store_status");
+  },
+  classify(sql: string): Promise<boolean> {
+    return invoke("classify_statement", { sql });
+  },
+  listSchemas(id: string): Promise<SchemaInfo[]> {
+    return invoke("list_schemas", { id });
+  },
+  listTables(id: string, schema: string): Promise<TableInfo[]> {
+    return invoke("list_tables", { id, schema });
+  },
+  describeTable(id: string, schema: string, table: string): Promise<TableDef> {
+    return invoke("describe_table", { id, schema, table });
+  },
+  listFunctions(id: string, schema: string): Promise<FunctionInfo[]> {
+    return invoke("list_functions", { id, schema });
+  },
+  tableDdl(id: string, schema: string, table: string): Promise<string> {
+    return invoke("table_ddl", { id, schema, table });
+  },
+  executeSql(id: string, sql: string): Promise<number> {
+    return invoke("execute_sql", { id, sql });
   },
 };
 

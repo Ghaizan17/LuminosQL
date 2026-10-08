@@ -30,6 +30,58 @@ export interface ConnectionView {
   live: boolean;
 }
 
+export interface SchemaInfo {
+  name: string;
+}
+
+export type TableKind = "table" | "view";
+
+export interface TableInfo {
+  schema: string;
+  name: string;
+  kind: TableKind;
+}
+
+export interface ColumnInfo {
+  name: string;
+  data_type: string;
+  nullable: boolean;
+  default: string | null;
+  pk_position: number | null;
+}
+
+export interface IndexInfo {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  primary: boolean;
+}
+
+export interface ForeignKeyInfo {
+  name: string;
+  columns: string[];
+  ref_schema: string;
+  ref_table: string;
+  ref_columns: string[];
+}
+
+export interface TableDef {
+  schema: string;
+  name: string;
+  kind: TableKind;
+  columns: ColumnInfo[];
+  indexes: IndexInfo[];
+  foreign_keys: ForeignKeyInfo[];
+}
+
+export interface FunctionInfo {
+  schema: string;
+  name: string;
+  arguments: string;
+  return_type: string;
+  language: string;
+}
+
 export const ENGINE_DEFAULT_PORT: Record<Engine, number> = {
   postgres: 5432,
   mysql: 3306,

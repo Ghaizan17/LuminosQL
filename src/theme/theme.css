@@ -119,3 +119,23 @@ input, textarea, select { font: inherit; color: var(--fg); background: var(--bg-
 .form-error { font-size: 12px; color: var(--error); border: 1px solid var(--error);
   border-radius: 4px; padding: 8px 10px; margin-top: 8px; }
 .form-error ul { margin: 4px 0 0; padding-left: 18px; }
+.tree-node { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px; }
+.twisty { color: var(--muted); font-size: 10px; width: 12px; flex: none; }
+.tree-icon { flex: none; }
+.tree-detail { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-backdrop { position: fixed; inset: 0; z-index: 60; }
+.menu { position: fixed; min-width: 200px; background: var(--bg-overlay); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px; display: flex; flex-direction: column; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.menu button { text-align: left; padding: 6px 10px; border-radius: 4px; }
+.menu button:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); }
+.menu button:disabled { opacity: .55; cursor: default; }
+.dialog.wide { width: 640px; }
+.dialog .row.col-row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+.dialog .row.col-row input { padding: 5px 6px; border-radius: 4px; }
+.dialog .row.col-row input:first-child { flex: 1.4; }
+.dialog .row.col-row select { padding: 5px 6px; border-radius: 4px; background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); }
+.dialog .check { display: inline-flex; align-items: center; gap: 4px; margin: 0; white-space: nowrap; }
+.sql-preview { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  padding: 8px 10px; font: var(--mono); font-size: 12px; overflow-x: auto; margin: 10px 0 0; }
+.dialog-actions button.danger { background: var(--error); color: #fff; border-color: transparent; }
+.dialog code { font: var(--mono); }
