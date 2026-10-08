@@ -45,10 +45,13 @@ one is green.
 - [x] 16 Rust + 28 UI tests green, clippy clean.
 - Exit: `SELECT u. FROM users u` suggests real columns from live schema. ✅
 
-## Phase 5 — Result / Data Viewer
+## Phase 5 — Result / Data Viewer ✅
 
-- Virtualized grid, pagination, sort/filter, inline edit, NULL/JSON handling.
-- Exit: million-row table browsable, never fully loaded into memory.
+- [x] Paged reads (sort/filter/COUNT), never full-table; 1M-row page+count in ~41 ms (measured live).
+- [x] Inline edit, insert, delete, duplicate (PK-guarded), NULL + JSON viewer, page CSV export.
+- [x] Open-data tabs from explorer; read-only without PK.
+- [x] 19 Rust + 28 UI tests green, clippy clean.
+- Exit: million-row table browsable, never fully loaded into memory. ✅
 
 ## Phase 6 — Migration System
 

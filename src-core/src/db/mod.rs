@@ -10,6 +10,7 @@ pub mod postgres;
 pub mod query;
 pub mod schema;
 pub mod sqlite;
+pub mod tabledata;
 
 /// What a successful connection test reports back to the UI.
 #[derive(Debug, Clone, PartialEq, Serialize)]

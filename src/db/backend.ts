@@ -7,11 +7,13 @@ import type {
   ConnectionView,
   FriendlyError,
   FunctionInfo,
+  PageOpts,
   QueryPage,
   SchemaInfo,
   ServerInfo,
   TableDef,
   TableInfo,
+  TablePage,
 } from "./types";
 
 declare global {
@@ -78,6 +80,18 @@ export const backend = {
   },
   runQuery(id: string, sql: string): Promise<QueryPage> {
     return invoke("run_query", { id, sql });
+  },
+  tablePage(id: string, schema: string, table: string, opts: PageOpts): Promise<TablePage> {
+    return invoke("table_page", { id, schema, table, opts });
+  },
+  updateCell(id: string, schema: string, table: string, pk: [string, string | null][], column: string, value: string | null): Promise<number> {
+    return invoke("update_cell", { id, schema, table, pk, column, value });
+  },
+  deleteRow(id: string, schema: string, table: string, pk: [string, string | null][]): Promise<number> {
+    return invoke("delete_row", { id, schema, table, pk });
+  },
+  insertRow(id: string, schema: string, table: string, values: [string, string | null][]): Promise<number> {
+    return invoke("insert_row", { id, schema, table, values });
   },
 };
 

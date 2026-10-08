@@ -253,6 +253,65 @@ impl<S: CredentialStore> ConnectionManager<S> {
         let def = self.describe_table(id, schema, table).await?;
         Ok(crate::db::ddl::create_table(&def, profile.engine))
     }
+
+    fn engine_of(&self, id: &str) -> Result<Engine, FriendlyError> {
+        self.get_profile(id).map(|p| p.engine).ok_or_else(|| FriendlyError::new("Connection not found.", "not-found", &[]))
+    }
+
+    pub async fn table_page(
+        &self,
+        id: &str,
+        schema: &str,
+        table: &str,
+        opts: crate::db::tabledata::PageOpts,
+    ) -> Result<crate::db::tabledata::TablePage, FriendlyError> {
+        let engine = self.engine_of(id)?;
+        let (rows_sql, count_sql) = crate::db::tabledata::select_page(engine, schema, table, &opts);
+        let adapter = self.live_adapter(id)?;
+        let page = adapter.query(&rows_sql).await?;
+        let count_page = adapter.query(&count_sql).await?;
+        let total_rows = count_page.rows.first().and_then(|r| r.first()).and_then(|v| v.as_u64()).unwrap_or(0);
+        let (page_index, page_size) = opts.safe();
+        Ok(crate::db::tabledata::TablePage { page, total_rows, page_index, page_size })
+    }
+
+    pub async fn update_cell(
+        &self,
+        id: &str,
+        schema: &str,
+        table: &str,
+        pk: Vec<(String, Option<String>)>,
+        column: &str,
+        value: Option<String>,
+    ) -> Result<u64, FriendlyError> {
+        let engine = self.engine_of(id)?;
+        let sql = crate::db::tabledata::update_sql(engine, schema, table, &pk, column, &value)?;
+        self.live_adapter(id)?.execute(&sql).await
+    }
+
+    pub async fn delete_row(
+        &self,
+        id: &str,
+        schema: &str,
+        table: &str,
+        pk: Vec<(String, Option<String>)>,
+    ) -> Result<u64, FriendlyError> {
+        let engine = self.engine_of(id)?;
+        let sql = crate::db::tabledata::delete_sql(engine, schema, table, &pk)?;
+        self.live_adapter(id)?.execute(&sql).await
+    }
+
+    pub async fn insert_row(
+        &self,
+        id: &str,
+        schema: &str,
+        table: &str,
+        values: Vec<(String, Option<String>)>,
+    ) -> Result<u64, FriendlyError> {
+        let engine = self.engine_of(id)?;
+        let sql = crate::db::tabledata::insert_sql(engine, schema, table, &values);
+        self.live_adapter(id)?.execute(&sql).await
+    }
 }
 
 pub type SharedManager<S = crate::security::AnyStore> = Arc<tokio::sync::Mutex<ConnectionManager<S>>>;
@@ -390,6 +449,36 @@ mod tests {
         // Engine errors surface as friendly errors, secrets intact-free.
         let err = mgr.run_query(id, "SELECT nope FROM m").await.unwrap_err();
         assert!(!err.title.is_empty());
+    }
+
+    #[tokio::test]
+    async fn sqlite_table_page_filters_sorts_and_mutates() {
+        use crate::db::tabledata::{Filter, FilterOp, PageOpts, Sort};
+        let mut mgr = ConnectionManager::new(MemoryStore::new());
+        let profile = mgr.save_profile(sqlite_profile(":memory:"), "").expect("profile saves");
+        mgr.connect(&profile).await.unwrap();
+        let id = &profile.id;
+        mgr.execute(id, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, total NUMERIC)").await.unwrap();
+        mgr.execute(id, "INSERT INTO t VALUES (1, 'a', 10), (2, 'b', 200), (3, 'c', 30)").await.unwrap();
+
+        let opts = PageOpts { page: 0, page_size: 50, sort: Some(Sort { column: "total".to_string(), desc: true }), filters: vec![Filter { column: "total".to_string(), op: FilterOp::Gt, value: "20".to_string() }] };
+        let tp = mgr.table_page(id, "main", "t", opts).await.unwrap();
+        assert_eq!(tp.total_rows, 2);
+        assert_eq!(tp.page.rows.len(), 2);
+        assert_eq!(tp.page.rows[0][1], serde_json::Value::from("b"));
+
+        let p1 = mgr.table_page(id, "main", "t", PageOpts { page: 1, page_size: 10, sort: None, filters: vec![] }).await.unwrap();
+        assert_eq!(p1.total_rows, 3);
+        assert!(p1.page.rows.is_empty());
+
+        let pk = vec![("id".to_string(), Some("1".to_string()))];
+        assert_eq!(mgr.update_cell(id, "main", "t", pk.clone(), "name", Some("z".to_string())).await.unwrap(), 1);
+        let one = mgr.run_query(id, "SELECT name FROM t WHERE id = 1").await.unwrap();
+        assert_eq!(one.rows[0][0], serde_json::Value::from("z"));
+        assert_eq!(mgr.delete_row(id, "main", "t", pk).await.unwrap(), 1);
+        assert_eq!(mgr.insert_row(id, "main", "t", vec![("id".to_string(), Some("9".to_string())), ("name".to_string(), None), ("total".to_string(), Some("5".to_string()))]).await.unwrap(), 1);
+        let count = mgr.table_page(id, "main", "t", PageOpts { page: 0, page_size: 50, sort: None, filters: vec![] }).await.unwrap();
+        assert_eq!(count.total_rows, 3);
     }
 
     #[tokio::test]

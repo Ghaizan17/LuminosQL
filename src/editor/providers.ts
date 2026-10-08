@@ -123,6 +123,7 @@ export async function openTableDefinition(
       id: `ddl-${connId}-${table.schema}-${table.name}`,
       title: `${table.name}.sql`,
       content: `-- Definition of ${table.schema}.${table.name} (read-only snapshot)\n${ddl}`,
+      kind: "sql",
     },
   });
 }

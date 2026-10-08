@@ -11,7 +11,7 @@ export interface Command {
 
 export const COMMANDS: Command[] = [
   { id: "palette", title: "Show Command Palette", phase: "1", run: (d) => d({ type: "set-palette", open: true }), shortcut: "Ctrl+Shift+P" },
-  { id: "new-query", title: "New SQL Query", phase: "1", run: (d) => d({ type: "open-tab", tab: { id: `q-${Date.now()}`, title: "query.sql", content: "SELECT 1;\n" } }) },
+  { id: "new-query", title: "New SQL Query", phase: "1", run: (d) => d({ type: "open-tab", tab: { id: `q-${Date.now()}`, title: "query.sql", content: "SELECT 1;\n", kind: "sql" } }) },
   { id: "split", title: "Toggle Split Editor", phase: "1", run: (d) => d({ type: "toggle-split" }) },
   { id: "sidebar", title: "Toggle Sidebar", phase: "1", run: (d) => d({ type: "toggle-sidebar" }), shortcut: "Ctrl+B" },
   { id: "terminal", title: "Toggle Bottom Panel", phase: "1", run: (d) => d({ type: "toggle-bottom" }), shortcut: "Ctrl+`" },

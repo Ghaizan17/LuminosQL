@@ -145,6 +145,51 @@ async fn run_query(
 ) -> Result<luminosql_core::db::query::QueryPage, FriendlyError> {
     state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.run_query(&id, &sql).await
 }
+#[tauri::command]
+async fn table_page(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+    table: String,
+    opts: luminosql_core::db::tabledata::PageOpts,
+) -> Result<luminosql_core::db::tabledata::TablePage, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.table_page(&id, &schema, &table, opts).await
+}
+
+#[tauri::command]
+async fn update_cell(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+    table: String,
+    pk: Vec<(String, Option<String>)>,
+    column: String,
+    value: Option<String>,
+) -> Result<u64, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.update_cell(&id, &schema, &table, pk, &column, value).await
+}
+
+#[tauri::command]
+async fn delete_row(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+    table: String,
+    pk: Vec<(String, Option<String>)>,
+) -> Result<u64, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.delete_row(&id, &schema, &table, pk).await
+}
+
+#[tauri::command]
+async fn insert_row(
+    state: State<'_, AppState>,
+    id: String,
+    schema: String,
+    table: String,
+    values: Vec<(String, Option<String>)>,
+) -> Result<u64, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.insert_row(&id, &schema, &table, values).await
+}
 
 fn main() {
     tauri::Builder::default()
@@ -166,6 +211,10 @@ fn main() {
             table_ddl,
             execute_sql,
             run_query,
+            table_page,
+            update_cell,
+            delete_row,
+            insert_row,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LuminosQL");

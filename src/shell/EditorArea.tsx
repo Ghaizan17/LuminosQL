@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect } from "react";
 import { backend, toFriendlyError } from "../db/backend";
 import { formatSql } from "../sql/format";
 import { useStore, type Action } from "../state/store";
+import { DataGrid } from "./DataGrid";
 
 // Monaco (~4 MB) loads after the shell paints — startup stays instant.
 const SqlEditor = lazy(() =>
@@ -85,11 +86,11 @@ function Pane({ tabId }: { tabId: string }) {
   useEffect(() => {
     const onRun = () => {
       const current = state.tabs.find((t) => t.id === tabId);
-      if (current && state.activeTabId === tabId) run(current.content);
+      if (current && current.kind === "sql" && state.activeTabId === tabId) run(current.content);
     };
     const onFormat = () => {
       const current = state.tabs.find((t) => t.id === tabId);
-      if (current && state.activeTabId === tabId) {
+      if (current && current.kind === "sql" && state.activeTabId === tabId) {
         dispatch({ type: "edit-tab", id: tabId, content: formatSql(current.content) });
       }
     };
@@ -102,6 +103,13 @@ function Pane({ tabId }: { tabId: string }) {
   }, [dispatch, run, state.activeTabId, state.tabs, tabId]);
 
   if (!tab) return <div className="placeholder">No file open. Ctrl+P → New SQL Query.</div>;
+  if (tab.kind === "data" && tab.dataRef) {
+    return (
+      <div className="pane-editor">
+        <DataGrid dataRef={tab.dataRef} />
+      </div>
+    );
+  }
   const conn = state.connections.find((c) => c.profile.id === state.activeConnectionId);
   return (
     <div className="pane-editor">

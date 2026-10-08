@@ -302,12 +302,12 @@ export function ExplorerTree({ connId, engine }: { connId: string; engine: Engin
       const ddl = await backend.tableDdl(node.connId, node.schema!, node.table!);
       dispatch({
         type: "open-tab",
-        tab: { id: `ddl-${node.connId}-${node.schema}-${node.table}`, title: `${node.table}.sql`, content: `-- Definition of ${node.schema}.${node.table} (read-only snapshot)\n${ddl}` },
+        tab: { id: `ddl-${node.connId}-${node.schema}-${node.table}`, title: `${node.table}.sql`, content: `-- Definition of ${node.schema}.${node.table} (read-only snapshot)\n${ddl}`, kind: "sql" },
       });
     } catch (e) {
       dispatch({
         type: "open-tab",
-        tab: { id: `err-${Date.now()}`, title: "error.txt", content: toFriendlyError(e).title },
+        tab: { id: `err-${Date.now()}`, title: "error.txt", content: toFriendlyError(e).title, kind: "sql" },
       });
     }
   };
@@ -317,7 +317,21 @@ export function ExplorerTree({ connId, engine }: { connId: string; engine: Engin
     const items: { label: string; disabled?: string; run?: () => void }[] = [];
     if (n.kind === "table" || n.kind === "view") {
       items.push(
-        { label: "Open data (Phase 5)", disabled: "Read-only grid has not landed yet" },
+        {
+          label: "Open data",
+          run: () => {
+            dispatch({
+              type: "open-tab",
+              tab: {
+                id: `data-${n.connId}-${n.schema}-${n.table}`,
+                title: `${n.table} (data)`,
+                content: "",
+                kind: "data",
+                dataRef: { connId: n.connId, schema: n.schema!, table: n.table! },
+              },
+            });
+          },
+        },
         { label: "Copy name", run: () => copy(n.table!) },
         { label: "Copy SELECT *", run: () => copy(buildSelectAll(engine, n.schema!, n.table!)) },
         { label: "View definition", run: () => viewDefinition(n) },

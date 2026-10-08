@@ -95,6 +95,28 @@ export interface QueryPage {
   truncated: boolean;
 }
 
+export type FilterOp = "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "like" | "isnull" | "isnotnull";
+
+export interface PageFilter {
+  column: string;
+  op: FilterOp;
+  value: string;
+}
+
+export interface PageOpts {
+  page: number;
+  page_size: number;
+  sort: { column: string; desc: boolean } | null;
+  filters: PageFilter[];
+}
+
+export interface TablePage {
+  page: QueryPage;
+  total_rows: number;
+  page_index: number;
+  page_size: number;
+}
+
 export const ENGINE_DEFAULT_PORT: Record<Engine, number> = {
   postgres: 5432,
   mysql: 3306,

@@ -45,11 +45,19 @@ export interface NodeCache {
 export type Theme = "dark" | "light";
 export type ActivityView = "explorer" | "search" | "migrations" | "history" | "settings";
 
+export interface DataTabRef {
+  connId: string;
+  schema: string;
+  table: string;
+}
+
 export interface EditorTab {
   id: string;
   title: string;
-  /** SQL text; Phase 4 replaces PlainEditor with Monaco behind the same tab model. */
+  /** SQL text for `sql` tabs; unused for `data` tabs. */
   content: string;
+  kind: "sql" | "data";
+  dataRef?: DataTabRef;
 }
 
 export interface ShellState {
@@ -96,6 +104,7 @@ const initial: ShellState = {
       id: "welcome",
       title: "welcome.sql",
       content: "-- Welcome to LuminosQL (Phase 1 shell)\n-- Connect (Phase 2) → Explore (Phase 3) → Query (Phase 4).\nSELECT * FROM users;\n",
+      kind: "sql",
     },
   ],
   activeTabId: "welcome",

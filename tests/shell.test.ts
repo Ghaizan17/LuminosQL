@@ -60,7 +60,7 @@ describe("shell reducer", () => {
   it("closing the active tab activates its neighbour", () => {
     const s: ShellState = {
       ...base,
-      tabs: [{ id: "a", title: "a.sql", content: "" }, { id: "b", title: "b.sql", content: "" }],
+      tabs: [{ id: "a", title: "a.sql", content: "", kind: "sql" }, { id: "b", title: "b.sql", content: "", kind: "sql" }],
       activeTabId: "b",
     };
     const next = reducer(s, { type: "close-tab", id: "b" });
