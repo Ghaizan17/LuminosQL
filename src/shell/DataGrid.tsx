@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { backend, toFriendlyError } from "../db/backend";
+import { buildInsertInto } from "../db/sqlBuilder";
 import type { FilterOp, FriendlyError, TableDef } from "../db/types";
+import { parseCsv, toCsvRow } from "../dx/csv";
+import { useStore } from "../state/store";
 
 export interface DataRef {
   connId: string;
@@ -36,13 +39,15 @@ function cellText(v: unknown): string {
   return String(v);
 }
 
-function toCsv(columns: string[], rows: unknown[][]): string {
-  const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  return [columns.map(q).join(","), ...rows.map((r) => r.map((v) => q(cellText(v))).join(","))].join("\n");
-}
 
 export function DataGrid({ dataRef }: { dataRef: DataRef }) {
   const { connId, schema, table } = dataRef;
+  const { state } = useStore();
+  const guarded = (): boolean => {
+    if (!state.settings.safeMode) return false;
+    setError({ title: "Blocked by Safe Mode.", causes: ["Disable Safe Mode in Settings to edit data."], code: "safe-mode" });
+    return true;
+  };
   const [def, setDef] = useState<TableDef | null>(null);
   const [page, setPage] = useState<PageData | null>(null);
   const [pageIdx, setPageIdx] = useState(0);
@@ -97,6 +102,7 @@ export function DataGrid({ dataRef }: { dataRef: DataRef }) {
     });
 
   const commitEdit = async (rowIdx: number, col: string) => {
+    if (guarded()) return;
     const row = page!.rows[rowIdx];
     setEditing(null);
     try {
@@ -108,7 +114,7 @@ export function DataGrid({ dataRef }: { dataRef: DataRef }) {
   };
 
   const removeRow = async (row: unknown[]) => {
-    if (!window.confirm(`Delete this row from ${table}?`)) return;
+    if (guarded()) return;
     try {
       await backend.deleteRow(connId, schema, table, pkOf(row));
       await load();
@@ -118,6 +124,7 @@ export function DataGrid({ dataRef }: { dataRef: DataRef }) {
   };
 
   const duplicateRow = async (row: unknown[]) => {
+    if (guarded()) return;
     const values = page!.columns
       .filter((c) => !pkCols.includes(c))
       .map((c): [string, string | null] => {
@@ -133,6 +140,7 @@ export function DataGrid({ dataRef }: { dataRef: DataRef }) {
   };
 
   const commitInsert = async () => {
+    if (guarded()) return;
     const values = (def?.columns ?? []).map((c): [string, string | null] => {
       const v = (insertVals[c.name] ?? "").trim();
       return [c.name, v === "" ? null : v];
@@ -147,14 +155,76 @@ export function DataGrid({ dataRef }: { dataRef: DataRef }) {
     }
   };
 
-  const exportCsv = () => {
-    if (!page) return;
-    const blob = new Blob([toCsv(page.columns, page.rows)], { type: "text/csv" });
+  const download = (name: string, text: string, mime: string) => {
+    const blob = new Blob([text], { type: mime });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${table}-page${pageIdx + 1}.csv`;
+    a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+
+  const exportCsv = () => {
+    if (!page) return;
+    download(`${table}-page${pageIdx + 1}.csv`, [toCsvRow(page.columns), ...page.rows.map((r) => toCsvRow(r.map(cellText)))].join("\n"), "text/csv");
+  };
+
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const exportFull = async (format: "csv" | "sql") => {
+    setExporting(format);
+    setError(null);
+    try {
+      const cols = page?.columns ?? [];
+      const all: unknown[][] = [];
+      let p = 0;
+      for (;;) {
+        const tp = await backend.tablePage(connId, schema, table, { page: p, page_size: 1000, sort, filters: filters.map((f) => ({ column: f.column, op: f.op, value: f.value })) });
+        all.push(...tp.page.rows);
+        if (tp.page.rows.length < 1000 || all.length >= 100000) break;
+        p += 1;
+        setExporting(`${format}… ${all.length}`);
+      }
+      if (format === "csv") {
+        download(`${table}-full.csv`, [toCsvRow(cols), ...all.map((r) => toCsvRow(r.map(cellText)))].join("\n"), "text/csv");
+      } else {
+        const ddl = await backend.tableDdl(connId, schema, table);
+        const engine = state.connections.find((c) => c.profile.id === connId)?.profile.engine ?? "postgres";
+        download(`${table}.sql`, `${ddl}\n\n${buildInsertInto(engine, schema, table, cols, all)}\n`, "application/sql");
+      }
+    } catch (e) {
+      setError(toFriendlyError(e));
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const importCsv = async (file: File) => {
+    if (guarded()) return;
+    setError(null);
+    try {
+      const rows = parseCsv(await file.text());
+      if (rows.length < 2) throw new Error("CSV needs a header row plus at least one data row.");
+      const header = rows[0];
+      const cols = page?.columns ?? [];
+      const idx = header.map((h) => cols.indexOf(h.trim()));
+      if (idx.every((i) => i === -1)) throw new Error("No CSV header matches a table column.");
+      let inserted = 0;
+      for (const r of rows.slice(1)) {
+        const values = idx.map((ci, hi): [string, string | null] => {
+          const raw = (r[hi] ?? "").trim();
+          return [cols[ci] ?? header[hi], raw === "" ? null : raw];
+        }).filter(([c]) => c && cols.includes(c));
+        if (values.length === 0) continue;
+        await backend.insertRow(connId, schema, table, values);
+        inserted += 1;
+      }
+      setNote(`Imported ${inserted} row(s).`);
+      await load();
+    } catch (e) {
+      setError(toFriendlyError(e instanceof Error ? e.message : e));
+    }
   };
 
   const totalPages = page ? Math.max(1, Math.ceil(page.total / pageSize)) : 1;
@@ -173,9 +243,28 @@ export function DataGrid({ dataRef }: { dataRef: DataRef }) {
           ))}
         </select>
         <button onClick={() => setInserting((v) => !v)}>+ Row</button>
-        <button onClick={exportCsv} disabled={!page}>Export CSV</button>
+        <button onClick={exportCsv} disabled={!page}>Export page</button>
+        <button onClick={() => void exportFull("csv")} disabled={!page || exporting !== null}>
+          {exporting?.startsWith("csv") ? exporting : "Export full CSV"}
+        </button>
+        <button onClick={() => void exportFull("sql")} disabled={!page || exporting !== null}>
+          {exporting?.startsWith("sql") ? exporting : "Export SQL"}
+        </button>
+        <label className="import-label">
+          Import CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void importCsv(f);
+            }}
+          />
+        </label>
         <button onClick={() => void load()}>Refresh</button>
-        <span className="muted">{pkCols.length === 0 ? "read-only: no primary key" : ""}</span>
+        <span className="muted">{note ?? (pkCols.length === 0 ? "read-only: no primary key" : "")}</span>
       </div>
       <div className="grid-filters">
         <select value={fCol} onChange={(e) => setFCol(e.target.value)}>

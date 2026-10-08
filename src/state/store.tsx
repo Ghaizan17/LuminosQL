@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer, type ReactNode } from "react";
+import { record, toggleFavorite, type HistoryEntry } from "../dx/history";
 import type { ConnectionView, Engine, FriendlyError, ServerInfo, TableDef } from "../db/types";
 
 export type TreeKind =
@@ -89,6 +90,14 @@ export interface ShellState {
   problems: Record<string, Problem[]>;
   /** Latest execution per editor tab (Phase 4 simple view; Phase 5 grid). */
   results: Record<string, QueryResult>;
+  history: HistoryEntry[];
+  settings: Settings;
+}
+
+export interface Settings {
+  pageSize: number;
+  explainDiagnostics: boolean;
+  safeMode: boolean;
 }
 
 const initial: ShellState = {
@@ -122,6 +131,8 @@ const initial: ShellState = {
   defs: {},
   problems: {},
   results: {},
+  history: [],
+  settings: { pageSize: 50, explainDiagnostics: true, safeMode: false },
 };
 
 export type Action =
@@ -149,7 +160,13 @@ export type Action =
   | { type: "tree-drop"; match: string }
   | { type: "problems-set"; tabId: string; problems: Problem[] }
   | { type: "query-started"; tabId: string; sql: string }
-  | { type: "query-done"; tabId: string; result: QueryResult };
+  | { type: "query-done"; tabId: string; result: QueryResult }
+  | { type: "history-record"; sql: string; connection: string; elapsedMs: number; ok: boolean }
+  | { type: "history-fav"; id: string }
+  | { type: "history-remove"; id: string }
+  | { type: "history-clear" }
+  | { type: "history-loaded"; entries: HistoryEntry[] }
+  | { type: "settings-set"; settings: Settings };
 
 export function reducer(s: ShellState, a: Action): ShellState {
   switch (a.type) {
@@ -260,8 +277,21 @@ export function reducer(s: ShellState, a: Action): ShellState {
       };
     case "query-done":
       return { ...s, results: { ...s.results, [a.tabId]: a.result } };
+    case "history-record":
+      return { ...s, history: record(s.history, a) };
+    case "history-fav":
+      return { ...s, history: toggleFavorite(s.history, a.id) };
+    case "history-remove":
+      return { ...s, history: s.history.filter((e) => e.id !== a.id) };
+    case "history-clear":
+      return { ...s, history: [] };
+    case "history-loaded":
+      return { ...s, history: a.entries };
+    case "settings-set":
+      return { ...s, settings: a.settings };
   }
 }
+
 
 const Ctx = createContext<{ state: ShellState; dispatch: React.Dispatch<Action> } | null>(null);
 

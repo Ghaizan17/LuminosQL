@@ -3,6 +3,7 @@ import { backend } from "../db/backend";
 import type { ColumnInfo } from "../db/types";
 import { parseTableRefs } from "../sql/aliases";
 import { formatSql } from "../sql/format";
+import { snippetsFor } from "../sql/snippets";
 import { suggestFor, type SchemaSnapshot, type TableSummary } from "../sql/suggest";
 import type { Action } from "../state/store";
 
@@ -51,19 +52,37 @@ export function registerSqlProviders(monaco: Monaco, getCtx: () => SchemaContext
           }),
         );
         const suggestions = suggestFor(sql, offset, toSnapshot(ctx, extra));
+        const word = model.getWordUntilPosition(position);
+        const prefix = sql.slice(offset - (position.column - word.startColumn), offset);
+        const snippets = snippetsFor(prefix).map((s) => ({
+          label: s.trigger,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          detail: s.label,
+          insertText: s.body,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range: {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: position.column - prefix.length,
+            endColumn: position.column,
+          },
+        }));
         return {
-          suggestions: suggestions.map((s) => ({
-            label: s.label,
-            kind: monaco.languages.CompletionItemKind[KIND_MAP[s.kind]],
-            detail: s.detail,
-            insertText: s.label,
-            range: {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: position.column,
-              endColumn: position.column,
-            },
-          })),
+          suggestions: [
+            ...snippets,
+            ...suggestions.map((s) => ({
+              label: s.label,
+              kind: monaco.languages.CompletionItemKind[KIND_MAP[s.kind]],
+              detail: s.detail,
+              insertText: s.label,
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              },
+            })),
+          ],
         };
       },
     }),

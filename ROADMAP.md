@@ -69,11 +69,15 @@ one is green.
 - [x] 30 UI tests green (layout + edge geometry covered).
 - Exit: import existing schema → diagram → generated SQL round-trips. ✅
 
-## Phase 8 — Advanced DX
+## Phase 8 — Advanced DX ✅
 
-- Query history, snippets, workspace `.database/` project files, settings UI,
-  import/export.
-- Exit: cold-start project open restores tabs + connections (sans secrets).
+- [x] Query history (search, favorites, reopen, clear) persisted locally.
+- [x] Snippets in completion; settings UI (page size, EXPLAIN toggle, safe mode).
+- [x] Safe mode enforced on run + grid mutations; EXPLAIN toggle honored.
+- [x] Workspace save/open (`.database/config.json`); cold restore keeps keyring secrets (proven).
+- [x] Full CSV/SQL export, CSV import, page export; dead palette entries pruned.
+- [x] 24 Rust + 36 UI tests green, clippy clean.
+- Exit: cold-start project open restores tabs + connections (sans secrets). ✅
 
 ## Phase 9 — Optional AI
 

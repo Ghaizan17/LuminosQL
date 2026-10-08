@@ -110,6 +110,12 @@ export const backend = {
   createMigration(dir: string, name: string): Promise<MigrationFile> {
     return invoke("create_migration", { dir, name });
   },
+  workspaceSave(dir: string, payload: string): Promise<void> {
+    return invoke("workspace_save", { dir, payload });
+  },
+  workspaceOpen(dir: string): Promise<string> {
+    return invoke("workspace_open", { dir });
+  },
 };
 
 export function toFriendlyError(e: unknown): FriendlyError {

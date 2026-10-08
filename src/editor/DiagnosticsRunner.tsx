@@ -20,8 +20,8 @@ function serverLine(message: string): number {
 }
 
 /** Debounced diagnostics for every open tab: instant client checks plus
- *  server EXPLAIN errors. Never flags what it cannot know — with no loaded
- *  schema and no connection, a tab stays clean.
+ *  server EXPLAIN errors (unless disabled in Settings). Never flags what it
+ *  cannot know — with no loaded schema and no connection, a tab stays clean.
  */
 export function DiagnosticsRunner() {
   const { state, dispatch } = useStore();
@@ -43,7 +43,7 @@ export function DiagnosticsRunner() {
         }
 
         for (const tab of state.tabs) {
-          if (!tab.content.trim()) {
+          if (tab.kind !== "sql" || !tab.content.trim()) {
             dispatch({ type: "problems-set", tabId: tab.id, problems: [] });
             continue;
           }
@@ -59,7 +59,7 @@ export function DiagnosticsRunner() {
               });
             }
           }
-          if (live && explainable(tab.content)) {
+          if (live && state.settings.explainDiagnostics && explainable(tab.content)) {
             const first = tab.content.split(";")[0];
             try {
               await backend.executeSql(live.profile.id, `EXPLAIN ${first}`);
@@ -83,7 +83,7 @@ export function DiagnosticsRunner() {
       })();
     }, 800);
     return () => clearTimeout(timer);
-  }, [state.tabs, state.connections, state.activeConnectionId, state.explorer, state.problems, dispatch]);
+  }, [state.tabs, state.connections, state.activeConnectionId, state.explorer, state.problems, state.settings.explainDiagnostics, dispatch]);
 
   return null;
 }

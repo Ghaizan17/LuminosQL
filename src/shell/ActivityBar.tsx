@@ -2,10 +2,10 @@ import { useStore, type ActivityView } from "../state/store";
 
 const ITEMS: { id: ActivityView; icon: string; label: string }[] = [
   { id: "explorer", icon: "🗂", label: "Explorer" },
-  { id: "search", icon: "🔍", label: "Search (Phase 8)" },
-  { id: "migrations", icon: "📦", label: "Migrations (Phase 6)" },
-  { id: "history", icon: "🕘", label: "Query History (Phase 8)" },
-  { id: "settings", icon: "⚙", label: "Settings (Phase 8)" },
+  { id: "search", icon: "🔍", label: "Search" },
+  { id: "migrations", icon: "📦", label: "Migrations" },
+  { id: "history", icon: "🕘", label: "Query History" },
+  { id: "settings", icon: "⚙", label: "Settings" },
 ];
 
 export function ActivityBar() {

@@ -471,6 +471,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn workspace_restore_keeps_keyring_secret() {
+        // Cold-start restore re-saves the same profile with no password;
+        // the stored secret (keyed by stable profile id) must survive.
+        let mut mgr = ConnectionManager::new(MemoryStore::new());
+        let profile = ConnectionProfile {
+            id: "stable-id".to_string(),
+            name: "pg".to_string(),
+            engine: Engine::Postgres,
+            host: "127.0.0.1".to_string(),
+            port: 5432,
+            database: "appdb".to_string(),
+            username: "u".to_string(),
+            ssl: false,
+        };
+        mgr.save_profile(profile.clone(), "s3cret").unwrap();
+        mgr.save_profile(profile, "").unwrap();
+        let got = mgr
+            .list_profiles()
+            .into_iter()
+            .next()
+            .and_then(|p| mgr.password_for(&p).ok());
+        assert_eq!(got.as_deref(), Some("s3cret"));
+    }
+
+    #[tokio::test]
     async fn sqlite_memory_connects_and_pings() {
         let mgr = ConnectionManager::new(MemoryStore::new());
         let mut mgr = mgr;

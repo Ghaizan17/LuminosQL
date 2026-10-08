@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 import { backend, isDesktop } from "./db/backend";
+import { load as loadHistory, save as saveHistory } from "./dx/history";
+import { load as loadSettings, save as saveSettings } from "./dx/settings";
+import { DiagnosticsRunner } from "./editor/DiagnosticsRunner";
 import { ActivityBar } from "./shell/ActivityBar";
 import { BottomPanel } from "./shell/BottomPanel";
 import { CommandPalette } from "./shell/CommandPalette";
 import { ConnectionDialog } from "./shell/ConnectionDialog";
-import { DiagnosticsRunner } from "./editor/DiagnosticsRunner";
 import { EditorArea } from "./shell/EditorArea";
 import { Sidebar } from "./shell/Sidebar";
 import { StatusBar } from "./shell/StatusBar";
@@ -28,6 +30,20 @@ export function App() {
       .then(({ views, storeOsBacked }) => dispatch({ type: "connections-loaded", views, storeOsBacked }))
       .catch(() => dispatch({ type: "connections-loaded", views: [], storeOsBacked: null }));
   }, [dispatch]);
+
+  // Restore persisted history + settings once; save on every change.
+  useEffect(() => {
+    dispatch({ type: "history-loaded", entries: loadHistory() });
+    dispatch({ type: "settings-set", settings: loadSettings() });
+  }, [dispatch]);
+
+  useEffect(() => {
+    saveHistory(state.history);
+  }, [state.history]);
+
+  useEffect(() => {
+    saveSettings(state.settings);
+  }, [state.settings]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

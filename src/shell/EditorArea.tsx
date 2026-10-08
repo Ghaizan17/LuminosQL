@@ -14,7 +14,9 @@ const SqlEditor = lazy(() =>
 async function execute(
   tabId: string,
   sql: string,
+  connName: string | null,
   connId: string | null,
+  safeMode: boolean,
   dispatch: React.Dispatch<Action>,
 ) {
   if (!connId) {
@@ -36,10 +38,28 @@ async function execute(
   }
   const statement = sql.trim();
   if (!statement) return;
-  dispatch({ type: "query-started", tabId, sql: statement });
+  if (safeMode) {
+    try {
+      if (await backend.classify(statement)) {
+        const blocked = {
+          title: "Blocked by Safe Mode.",
+          causes: ["This statement may modify data.", "Disable Safe Mode in Settings to run it."],
+          code: "safe-mode",
+        };
+        dispatch({ type: "query-done", tabId, result: { sql: statement, columns: [], rows: [], rowsAffected: 0, elapsedMs: 0, truncated: false, running: false, error: blocked } });
+        return;
+      }
+    } catch {
+      /* classifier unavailable (browser mode) — fall through to run attempt */
+    }
+  }
   const start = performance.now();
+  const finish = (elapsedMs: number, ok: boolean) =>
+    dispatch({ type: "history-record", sql: statement, connection: connName ?? "—", elapsedMs, ok });
   try {
     const page = await backend.runQuery(connId, statement);
+    const elapsedMs = Math.round(performance.now() - start);
+    finish(elapsedMs, true);
     dispatch({
       type: "query-done",
       tabId,
@@ -48,12 +68,14 @@ async function execute(
         columns: page.columns.map((c) => c.name),
         rows: page.rows,
         rowsAffected: page.rows_affected,
-        elapsedMs: Math.round(performance.now() - start),
+        elapsedMs,
         truncated: page.truncated,
         running: false,
       },
     });
   } catch (e) {
+    const elapsedMs = Math.round(performance.now() - start);
+    finish(elapsedMs, false);
     dispatch({
       type: "query-done",
       tabId,
@@ -62,7 +84,7 @@ async function execute(
         columns: [],
         rows: [],
         rowsAffected: 0,
-        elapsedMs: Math.round(performance.now() - start),
+        elapsedMs,
         truncated: false,
         running: false,
         error: toFriendlyError(e),
@@ -78,9 +100,9 @@ function Pane({ tabId }: { tabId: string }) {
   const run = useCallback(
     (sql: string) => {
       const view = state.connections.find((c) => c.profile.id === state.activeConnectionId);
-      void execute(tabId, sql, view?.live ? view.profile.id : null, dispatch);
+      void execute(tabId, sql, view?.live ? view.profile.name : null, view?.live ? view.profile.id : null, state.settings.safeMode, dispatch);
     },
-    [dispatch, state.activeConnectionId, state.connections, tabId],
+    [dispatch, state.activeConnectionId, state.connections, state.settings.safeMode, tabId],
   );
 
   // Palette / shortcut bridge: commands dispatch window events (they hold no state).

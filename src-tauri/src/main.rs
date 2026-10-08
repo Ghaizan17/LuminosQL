@@ -214,6 +214,24 @@ async fn create_migration(dir: String, name: String) -> Result<luminosql_core::m
     std::fs::write(format!("{dir}/{filename}"), &body).map_err(|e| format!("Cannot write '{filename}': {e}"))?;
     luminosql_core::migrations::parse_file(&filename, &body).ok_or_else(|| "Template failed to parse.".to_string())
 }
+
+/// Persist opaque workspace JSON (profiles sans secrets, tabs, settings)
+/// under `<dir>/.database/config.json`. Secrets stay in the keyring.
+#[tauri::command]
+async fn workspace_save(dir: String, payload: String) -> Result<(), String> {
+    serde_json::from_str::<serde_json::Value>(&payload)
+        .map_err(|e| format!("Invalid workspace payload: {e}"))?;
+    let path = std::path::Path::new(&dir).join(".database");
+    std::fs::create_dir_all(&path).map_err(|e| format!("Cannot create '{dir}/.database': {e}"))?;
+    std::fs::write(path.join("config.json"), payload).map_err(|e| format!("Cannot write workspace: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn workspace_open(dir: String) -> Result<String, String> {
+    std::fs::read_to_string(std::path::Path::new(&dir).join(".database").join("config.json"))
+        .map_err(|_| format!("No workspace found in '{dir}' (expected .database/config.json)."))
+}
 #[tauri::command]
 async fn table_page(
     state: State<'_, AppState>,
@@ -289,6 +307,8 @@ fn main() {
             migrate_up,
             migrate_down,
             create_migration,
+            workspace_save,
+            workspace_open,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LuminosQL");

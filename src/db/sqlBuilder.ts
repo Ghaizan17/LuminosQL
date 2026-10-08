@@ -54,3 +54,16 @@ export function buildDropTable(engine: Engine, schema: string, table: string): s
 export function buildSelectAll(engine: Engine, schema: string, table: string): string {
   return `SELECT * FROM ${qualified(schema, table, engine)};`;
 }
+
+export function sqlLiteral(v: unknown): string {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+/** Multi-row INSERT for SQL export. Values are JSON-decoded cell values. */
+export function buildInsertInto(engine: Engine, schema: string, table: string, cols: string[], rows: unknown[][]): string {
+  const head = `INSERT INTO ${qualified(schema, table, engine)} (${cols.map((c) => quoteIdent(c, engine)).join(", ")}) VALUES`;
+  const lines = rows.map((r) => `(${r.map(sqlLiteral).join(", ")});`);
+  return `${head}\n${lines.join("\n")}`;
+}
