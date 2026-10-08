@@ -3,6 +3,7 @@ import { backend, toFriendlyError } from "../db/backend";
 import { formatSql } from "../sql/format";
 import { useStore, type Action } from "../state/store";
 import { DataGrid } from "./DataGrid";
+import { Designer } from "./Designer";
 
 // Monaco (~4 MB) loads after the shell paints — startup stays instant.
 const SqlEditor = lazy(() =>
@@ -107,6 +108,14 @@ function Pane({ tabId }: { tabId: string }) {
     return (
       <div className="pane-editor">
         <DataGrid dataRef={tab.dataRef} />
+      </div>
+    );
+  }
+  if (tab.kind === "design" && tab.designRef) {
+    const view = state.connections.find((c) => c.profile.id === tab.designRef!.connId);
+    return (
+      <div className="pane-editor">
+        <Designer designRef={tab.designRef} engine={view?.profile.engine ?? "postgres"} />
       </div>
     );
   }

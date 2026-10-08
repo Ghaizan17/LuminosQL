@@ -346,6 +346,21 @@ export function ExplorerTree({ connId, engine }: { connId: string; engine: Engin
       }
     } else if (n.kind === "schema") {
       items.push(
+        {
+          label: "Show diagram",
+          run: () => {
+            dispatch({
+              type: "open-tab",
+              tab: {
+                id: `design-${n.connId}-${n.schema}`,
+                title: `${n.schema} (diagram)`,
+                content: "",
+                kind: "design",
+                designRef: { connId: n.connId, schema: n.schema! },
+              },
+            });
+          },
+        },
         { label: "New table…", run: () => { setDialog({ kind: "new-table", connId: n.connId, engine, schema: n.schema! }); setMenu(null); } },
         { label: "Copy name", run: () => copy(n.schema!) },
         { label: "Refresh", run: () => refreshNode(n) },

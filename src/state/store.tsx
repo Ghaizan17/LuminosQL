@@ -54,10 +54,11 @@ export interface DataTabRef {
 export interface EditorTab {
   id: string;
   title: string;
-  /** SQL text for `sql` tabs; unused for `data` tabs. */
+  /** SQL text for `sql` tabs; unused for `data`/`design` tabs. */
   content: string;
-  kind: "sql" | "data";
+  kind: "sql" | "data" | "design";
   dataRef?: DataTabRef;
+  designRef?: { connId: string; schema: string };
 }
 
 export interface ShellState {

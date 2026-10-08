@@ -61,10 +61,13 @@ one is green.
 - [x] 23 Rust (incl. live pg + mysql cycles) + 28 UI tests green, clippy clean.
 - Exit: up/down cycle tested on pg + mysql + sqlite. ✅
 
-## Phase 7 — Database Designer
+## Phase 7 — Database Designer ✅
 
-- ER diagram (SVG): drag, zoom, pan, relationships, SQL generation.
-- Exit: import existing schema → diagram → generated SQL round-trips.
+- [x] SVG canvas: grid auto-layout, drag, zoom/pan, FK edges with tooltips.
+- [x] Position persistence, SQL generation tab, SVG export, add-relationship dialog.
+- [x] Show-diagram from schema context menu; sqlite honest about ADD CONSTRAINT.
+- [x] 30 UI tests green (layout + edge geometry covered).
+- Exit: import existing schema → diagram → generated SQL round-trips. ✅
 
 ## Phase 8 — Advanced DX
 
