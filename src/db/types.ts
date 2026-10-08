@@ -82,6 +82,19 @@ export interface FunctionInfo {
   language: string;
 }
 
+export interface QueryColumn {
+  name: string;
+  data_type: string;
+}
+
+export interface QueryPage {
+  columns: QueryColumn[];
+  rows: unknown[][];
+  rows_affected: number;
+  elapsed_ms: number;
+  truncated: boolean;
+}
+
 export const ENGINE_DEFAULT_PORT: Record<Engine, number> = {
   postgres: 5432,
   mysql: 3306,

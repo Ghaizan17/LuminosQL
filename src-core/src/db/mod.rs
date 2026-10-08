@@ -7,6 +7,7 @@ use std::time::Duration;
 pub mod ddl;
 pub mod mysql;
 pub mod postgres;
+pub mod query;
 pub mod schema;
 pub mod sqlite;
 
@@ -62,4 +63,7 @@ pub trait DatabaseAdapter: Send + Sync {
     /// Execute one DDL/DML statement. Returns rows affected.
     /// The caller gates destructive statements (see `classify`).
     async fn execute(&self, sql: &str) -> Result<u64, FriendlyError>;
+    /// Run one statement: rows for SELECT-like, affected count otherwise.
+    /// Pages are capped (`query::QUERY_ROW_LIMIT`); `truncated` says more exist.
+    async fn query(&self, sql: &str) -> Result<query::QueryPage, FriendlyError>;
 }

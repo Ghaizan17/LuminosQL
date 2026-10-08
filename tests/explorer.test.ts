@@ -52,6 +52,8 @@ const BASE: ShellState = {
   explorer: {},
   expanded: {},
   defs: {},
+  problems: {},
+  results: {},
 };
 
 async function walk(actions: { node: TreeNode }[]): Promise<ShellState> {

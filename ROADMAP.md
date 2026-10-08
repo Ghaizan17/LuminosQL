@@ -35,11 +35,15 @@ one is green.
 - [x] 14 Rust tests + 17 UI tests green, clippy clean.
 - Exit: 1k-table schema browses without UI jank (lazy + cached). ✅
 
-## Phase 4 — SQL Editor
+## Phase 4 — SQL Editor ✅
 
-- Monaco + syntax highlight, schema-aware autocomplete, diagnostics, formatting,
-  hover, go-to-definition. `EditorPane` interface already exists from Phase 1.
-- Exit: `SELECT u. FROM users u` suggests real columns from live schema.
+- [x] Monaco (local bundle, lazy chunk) + themes, syntax highlight.
+- [x] Schema-aware autocomplete (`alias.` columns, FROM tables, keywords) from live schema.
+- [x] Hover, F12 go-to-definition (DDL tab), document formatting, Ctrl+Enter run.
+- [x] Query execution: capped streaming pages, JSON value decoding, DML affected counts.
+- [x] Diagnostics: client unknown-table squiggles + server EXPLAIN errors → Problems.
+- [x] 16 Rust + 28 UI tests green, clippy clean.
+- Exit: `SELECT u. FROM users u` suggests real columns from live schema. ✅
 
 ## Phase 5 — Result / Data Viewer
 

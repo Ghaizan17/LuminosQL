@@ -137,3 +137,36 @@ async fn execute_sql(state: State<'_, AppState>, id: String, sql: String) -> Res
     state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.execute(&id, &sql).await
 }
 
+#[tauri::command]
+async fn run_query(
+    state: State<'_, AppState>,
+    id: String,
+    sql: String,
+) -> Result<luminosql_core::db::query::QueryPage, FriendlyError> {
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.run_query(&id, &sql).await
+}
+
+fn main() {
+    tauri::Builder::default()
+        .manage(AppState {
+            mgr: Mutex::new(ConnectionManager::new(AnyStore::auto())),
+        })
+        .invoke_handler(tauri::generate_handler![
+            create_connection,
+            list_connections,
+            connect,
+            disconnect,
+            delete_connection,
+            credential_store_status,
+            classify_statement,
+            list_schemas,
+            list_tables,
+            describe_table,
+            list_functions,
+            table_ddl,
+            execute_sql,
+            run_query,
+        ])
+        .run(tauri::generate_context!())
+        .expect("failed to run LuminosQL");
+}

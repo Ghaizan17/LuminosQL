@@ -184,6 +184,22 @@ impl super::DatabaseAdapter for SqliteAdapter {
             .map_err(|e| map_error(&e.to_string()))?
             .rows_affected())
     }
+
+    async fn query(&self, sql: &str) -> Result<super::query::QueryPage, FriendlyError> {
+        if super::query::returns_rows(sql) {
+            super::query::lite::fetch_page(self.lite_pool()?, sql).await
+        } else {
+            let start = std::time::Instant::now();
+            let rows_affected = self.execute(sql).await?;
+            Ok(super::query::QueryPage {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                rows_affected,
+                elapsed_ms: start.elapsed().as_millis() as u64,
+                truncated: false,
+            })
+        }
+    }
 }
 impl SqliteAdapter {
     fn lite_pool(&self) -> Result<&sqlx::SqlitePool, FriendlyError> {
@@ -212,7 +228,7 @@ fn quote_id(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-fn map_error(msg: &str) -> FriendlyError {
+pub(super) fn map_error(msg: &str) -> FriendlyError {
     let m = msg.to_lowercase();
     if m.contains("unable to open database file") {
         FriendlyError::new(

@@ -4,6 +4,7 @@ import { ActivityBar } from "./shell/ActivityBar";
 import { BottomPanel } from "./shell/BottomPanel";
 import { CommandPalette } from "./shell/CommandPalette";
 import { ConnectionDialog } from "./shell/ConnectionDialog";
+import { DiagnosticsRunner } from "./editor/DiagnosticsRunner";
 import { EditorArea } from "./shell/EditorArea";
 import { Sidebar } from "./shell/Sidebar";
 import { StatusBar } from "./shell/StatusBar";
@@ -58,6 +59,7 @@ export function App() {
       <StatusBar />
       <CommandPalette />
       <ConnectionDialog />
+      <DiagnosticsRunner />
     </div>
   );
 }

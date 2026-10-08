@@ -6,6 +6,26 @@ export type TreeKind =
   | "table" | "view" | "function" | "group-cols" | "col" | "group-idx" | "idx"
   | "group-fk" | "fk";
 
+export interface Problem {
+  line: number;
+  column: number;
+  message: string;
+  severity: "error" | "warning";
+}
+
+export interface QueryResult {
+  sql: string;
+  columns: string[];
+  /** JSON values; `null` for SQL NULL. */
+  rows: unknown[][];
+  rowsAffected: number;
+  elapsedMs: number;
+  /** True when the server had more rows than `rows` holds. */
+  truncated: boolean;
+  error?: FriendlyError;
+  running: boolean;
+}
+
 export interface TreeNode {
   key: string;
   label: string;
@@ -56,6 +76,10 @@ export interface ShellState {
   expanded: Record<string, true>;
   /** describe_table results by `table:{conn}:{schema}:{table}` key. */
   defs: Record<string, TableDef>;
+  /** Diagnostics per editor tab, mirrored into Monaco markers. */
+  problems: Record<string, Problem[]>;
+  /** Latest execution per editor tab (Phase 4 simple view; Phase 5 grid). */
+  results: Record<string, QueryResult>;
 }
 
 const initial: ShellState = {
@@ -86,6 +110,8 @@ const initial: ShellState = {
   explorer: {},
   expanded: {},
   defs: {},
+  problems: {},
+  results: {},
 };
 
 export type Action =
@@ -110,7 +136,10 @@ export type Action =
   | { type: "tree-ready"; key: string; items: TreeNode[] }
   | { type: "tree-failed"; key: string; error: FriendlyError }
   | { type: "tree-def"; key: string; def: TableDef }
-  | { type: "tree-drop"; match: string };
+  | { type: "tree-drop"; match: string }
+  | { type: "problems-set"; tabId: string; problems: Problem[] }
+  | { type: "query-started"; tabId: string; sql: string }
+  | { type: "query-done"; tabId: string; result: QueryResult };
 
 export function reducer(s: ShellState, a: Action): ShellState {
   switch (a.type) {
@@ -209,6 +238,18 @@ export function reducer(s: ShellState, a: Action): ShellState {
       for (const k of Object.keys(defs)) if (k.includes(a.match)) delete defs[k];
       return { ...s, explorer, defs };
     }
+    case "problems-set":
+      return { ...s, problems: { ...s.problems, [a.tabId]: a.problems } };
+    case "query-started":
+      return {
+        ...s,
+        results: {
+          ...s.results,
+          [a.tabId]: { sql: a.sql, columns: [], rows: [], rowsAffected: 0, elapsedMs: 0, truncated: false, running: true },
+        },
+      };
+    case "query-done":
+      return { ...s, results: { ...s.results, [a.tabId]: a.result } };
   }
 }
 

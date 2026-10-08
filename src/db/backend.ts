@@ -7,6 +7,7 @@ import type {
   ConnectionView,
   FriendlyError,
   FunctionInfo,
+  QueryPage,
   SchemaInfo,
   ServerInfo,
   TableDef,
@@ -74,6 +75,9 @@ export const backend = {
   },
   executeSql(id: string, sql: string): Promise<number> {
     return invoke("execute_sql", { id, sql });
+  },
+  runQuery(id: string, sql: string): Promise<QueryPage> {
+    return invoke("run_query", { id, sql });
   },
 };
 

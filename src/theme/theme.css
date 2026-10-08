@@ -138,4 +138,25 @@ input, textarea, select { font: inherit; color: var(--fg); background: var(--bg-
 .sql-preview { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; font: var(--mono); font-size: 12px; overflow-x: auto; margin: 10px 0 0; }
 .dialog-actions button.danger { background: var(--error); color: #fff; border-color: transparent; }
-.dialog code { font: var(--mono); }
+.pane-editor { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.editor-toolbar { display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  background: var(--bg-raised); border-bottom: 1px solid var(--border); font-size: 12px; }
+.editor-toolbar button { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); }
+.editor-toolbar button.run { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.editor-toolbar .conn-label { margin-left: auto; color: var(--muted); }
+.pane-monaco { flex: 1; min-height: 0; }
+.pane-monaco section { height: 100%; }
+.result-meta { margin-bottom: 6px; color: var(--success); }
+.result-error { color: var(--error); }
+.result-error strong { display: block; margin-bottom: 4px; }
+.result-grid { border-collapse: collapse; font-size: 12px; }
+.result-grid th, .result-grid td { border: 1px solid var(--border); padding: 3px 8px;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-grid th { background: var(--bg-overlay); text-align: left; }
+.result-grid td.null { color: var(--muted); font-style: italic; }
+.problem-row { display: flex; gap: 8px; padding: 3px 4px; cursor: pointer; border-radius: 4px; }
+.problem-row:hover { background: var(--row-hover); }
+.problem-row .error { color: var(--error); }
+.problem-row .warning { color: var(--warning); }
+.problem-row .muted { color: var(--muted); margin-left: auto; }
+.status-problems { cursor: pointer; }

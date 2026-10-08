@@ -25,6 +25,8 @@ const base: ShellState = {
   explorer: {},
   expanded: {},
   defs: {},
+  problems: {},
+  results: {},
 };
 
 describe("command palette", () => {

@@ -243,6 +243,10 @@ impl<S: CredentialStore> ConnectionManager<S> {
         self.live_adapter(id)?.execute(sql).await
     }
 
+    pub async fn run_query(&self, id: &str, sql: &str) -> Result<crate::db::query::QueryPage, FriendlyError> {
+        self.live_adapter(id)?.query(sql).await
+    }
+
     /// `CREATE TABLE` for an introspected table in its own dialect.
     pub async fn table_ddl(&self, id: &str, schema: &str, table: &str) -> Result<String, FriendlyError> {
         let profile = self.get_profile(id).ok_or_else(|| FriendlyError::new("Connection not found.", "not-found", &[]))?;
@@ -358,6 +362,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sqlite_query_decodes_types_caps_rows_and_counts_dml() {
+        use serde_json::Value;
+        let mut mgr = ConnectionManager::new(MemoryStore::new());
+        let profile = sqlite_profile(":memory:");
+        mgr.connect(&profile).await.unwrap();
+        let id = &profile.id;
+        mgr.execute(id, "CREATE TABLE m (i INTEGER, r REAL, t TEXT, b BLOB, n TEXT)").await.unwrap();
+        mgr.execute(id, "INSERT INTO m VALUES (42, 1.5, 'hi', x'00ff', NULL)").await.unwrap();
+
+        let page = mgr.run_query(id, "SELECT * FROM m").await.unwrap();
+        assert_eq!(page.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["i", "r", "t", "b", "n"]);
+        assert_eq!(page.rows[0], [Value::from(42), Value::from(1.5), Value::from("hi"), Value::from("00ff"), Value::Null]);
+        assert!(!page.truncated);
+
+        // 600 rows → capped at 500 with truncation flag.
+        mgr.execute(id, "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 600) INSERT INTO m (i) SELECT x FROM c").await.unwrap();
+        let big = mgr.run_query(id, "SELECT i FROM m ORDER BY i").await.unwrap();
+        assert_eq!(big.rows.len(), 500);
+        assert!(big.truncated);
+
+        // DML returns affected counts, no rows (i=42 exists twice: seed + CTE).
+        let updated = mgr.run_query(id, "UPDATE m SET t = 'x' WHERE i = 42").await.unwrap();
+        assert!(updated.rows.is_empty());
+        assert_eq!(updated.rows_affected, 2);
+
+        // Engine errors surface as friendly errors, secrets intact-free.
+        let err = mgr.run_query(id, "SELECT nope FROM m").await.unwrap_err();
+        assert!(!err.title.is_empty());
+    }
+
+    #[tokio::test]
     async fn postgres_unreachable_is_friendly_without_server() {
         let mut mgr = ConnectionManager::new(MemoryStore::new());
         let profile = ConnectionProfile {
@@ -445,6 +480,13 @@ mod tests {
             assert!(def.indexes.iter().any(|i| i.name == "orders_user_idx"));
             let ddl = mgr.table_ddl(&profile.id, "lumi_itest", "users").await.unwrap();
             assert!(ddl.contains("CREATE TABLE \"lumi_itest\".\"users\""), "{ddl}");
+            mgr.execute(&profile.id, "INSERT INTO lumi_itest.users (email) VALUES ('a@x.io')").await.unwrap();
+            let page = mgr.run_query(&profile.id, "SELECT id, email FROM lumi_itest.users").await.unwrap();
+            assert_eq!(page.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["id", "email"]);
+            assert_eq!(page.rows.len(), 1);
+            assert_eq!(page.rows[0][1], serde_json::Value::from("a@x.io"));
+            let bad = mgr.run_query(&profile.id, "SELECT nope FROM lumi_itest.users").await.unwrap_err();
+            assert!(bad.title.contains("nope") || !bad.causes.is_empty(), "got: {bad:?}");
             mgr.execute(&profile.id, "DROP SCHEMA lumi_itest CASCADE").await.unwrap();
             mgr.disconnect(&profile.id).await;
             assert!(!mgr.is_live(&profile.id));
@@ -495,6 +537,10 @@ mod tests {
             assert_eq!(def.foreign_keys[0].ref_table, "lumi_users");
             let ddl = mgr.table_ddl(&profile.id, &profile.database, "lumi_users").await.unwrap();
             assert!(ddl.contains("CREATE TABLE"), "{ddl}");
+            mgr.execute(&profile.id, "INSERT INTO lumi_users (email) VALUES ('a@x.io')").await.unwrap();
+            let page = mgr.run_query(&profile.id, "SELECT id, email FROM lumi_users").await.unwrap();
+            assert_eq!(page.rows.len(), 1);
+            assert_eq!(page.rows[0][1], serde_json::Value::from("a@x.io"));
             mgr.execute(&profile.id, "DROP TABLE lumi_orders").await.unwrap();
             mgr.execute(&profile.id, "DROP TABLE lumi_users").await.unwrap();
             mgr.disconnect(&profile.id).await;
