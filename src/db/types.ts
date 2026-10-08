@@ -117,6 +117,21 @@ export interface TablePage {
   page_size: number;
 }
 
+export interface MigrationFile {
+  version: string;
+  name: string;
+  up_sql: string;
+  down_sql: string | null;
+  checksum: string;
+}
+
+export interface MigrationState {
+  version: string;
+  name: string;
+  applied: boolean;
+  checksum_ok: boolean;
+}
+
 export const ENGINE_DEFAULT_PORT: Record<Engine, number> = {
   postgres: 5432,
   mysql: 3306,

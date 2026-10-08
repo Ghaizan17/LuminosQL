@@ -145,6 +145,75 @@ async fn run_query(
 ) -> Result<luminosql_core::db::query::QueryPage, FriendlyError> {
     state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.run_query(&id, &sql).await
 }
+
+fn read_migration_dir(dir: &str) -> Result<Vec<luminosql_core::migrations::MigrationFile>, String> {
+    let entries = std::fs::read_dir(dir).map_err(|e| format!("Cannot read migrations directory '{dir}': {e}"))?;
+    let mut files = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Cannot list '{dir}': {e}"))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.ends_with(".sql") {
+            continue;
+        }
+        let body = std::fs::read_to_string(entry.path()).map_err(|e| format!("Cannot read '{name}': {e}"))?;
+        if let Some(m) = luminosql_core::migrations::parse_file(&name, &body) {
+            files.push(m);
+        }
+    }
+    files.sort_by(|a, b| a.version.cmp(&b.version).then(a.name.cmp(&b.name)));
+    Ok(files)
+}
+
+#[tauri::command]
+async fn list_migrations(dir: String) -> Result<Vec<luminosql_core::migrations::MigrationFile>, String> {
+    read_migration_dir(&dir)
+}
+
+#[tauri::command]
+async fn migration_status(
+    state: State<'_, AppState>,
+    id: String,
+    dir: String,
+) -> Result<Vec<luminosql_core::migrations::MigrationState>, FriendlyError> {
+    let files = read_migration_dir(&dir).map_err(|e| FriendlyError::new(&e, "bad-dir", &[]))?;
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.migration_status(&id, files).await
+}
+
+#[tauri::command]
+async fn migrate_up(state: State<'_, AppState>, id: String, dir: String, version: String) -> Result<(), FriendlyError> {
+    let file = read_migration_dir(&dir)
+        .map_err(|e| FriendlyError::new(&e, "bad-dir", &[]))?
+        .into_iter()
+        .find(|f| f.version == version)
+        .ok_or_else(|| FriendlyError::new(&format!("Migration {version} not found."), "not-found", &[]))?;
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.migrate_up(&id, file).await
+}
+
+#[tauri::command]
+async fn migrate_down(state: State<'_, AppState>, id: String, dir: String, version: String) -> Result<(), FriendlyError> {
+    let file = read_migration_dir(&dir)
+        .map_err(|e| FriendlyError::new(&e, "bad-dir", &[]))?
+        .into_iter()
+        .find(|f| f.version == version)
+        .ok_or_else(|| FriendlyError::new(&format!("Migration {version} not found."), "not-found", &[]))?;
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.migrate_down(&id, file).await
+}
+
+#[tauri::command]
+async fn create_migration(dir: String, name: String) -> Result<luminosql_core::migrations::MigrationFile, String> {
+    let clean: String = name.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' }).collect();
+    let clean = clean.trim_matches('_').to_string();
+    if clean.is_empty() {
+        return Err("Migration name must contain letters or digits.".to_string());
+    }
+    let files = read_migration_dir(&dir)?;
+    let next = files.iter().filter_map(|f| f.version.parse::<u64>().ok()).max().unwrap_or(0) + 1;
+    let filename = format!("{next:03}_{clean}.sql");
+    let body = format!("-- {filename}\n\n\n-- DOWN\n");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create '{dir}': {e}"))?;
+    std::fs::write(format!("{dir}/{filename}"), &body).map_err(|e| format!("Cannot write '{filename}': {e}"))?;
+    luminosql_core::migrations::parse_file(&filename, &body).ok_or_else(|| "Template failed to parse.".to_string())
+}
 #[tauri::command]
 async fn table_page(
     state: State<'_, AppState>,
@@ -215,6 +284,11 @@ fn main() {
             update_cell,
             delete_row,
             insert_row,
+            list_migrations,
+            migration_status,
+            migrate_up,
+            migrate_down,
+            create_migration,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LuminosQL");

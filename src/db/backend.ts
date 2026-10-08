@@ -9,6 +9,8 @@ import type {
   FunctionInfo,
   PageOpts,
   QueryPage,
+  MigrationFile,
+  MigrationState,
   SchemaInfo,
   ServerInfo,
   TableDef,
@@ -92,6 +94,21 @@ export const backend = {
   },
   insertRow(id: string, schema: string, table: string, values: [string, string | null][]): Promise<number> {
     return invoke("insert_row", { id, schema, table, values });
+  },
+  listMigrations(dir: string): Promise<MigrationFile[]> {
+    return invoke("list_migrations", { dir });
+  },
+  migrationStatus(id: string, dir: string): Promise<MigrationState[]> {
+    return invoke("migration_status", { id, dir });
+  },
+  migrateUp(id: string, dir: string, version: string): Promise<void> {
+    return invoke("migrate_up", { id, dir, version });
+  },
+  migrateDown(id: string, dir: string, version: string): Promise<void> {
+    return invoke("migrate_down", { id, dir, version });
+  },
+  createMigration(dir: string, name: string): Promise<MigrationFile> {
+    return invoke("create_migration", { dir, name });
   },
 };
 

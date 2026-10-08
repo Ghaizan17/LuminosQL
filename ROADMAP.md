@@ -53,10 +53,13 @@ one is green.
 - [x] 19 Rust + 28 UI tests green, clippy clean.
 - Exit: million-row table browsable, never fully loaded into memory. ✅
 
-## Phase 6 — Migration System
+## Phase 6 — Migration System ✅
 
-- Ordered `.sql` files, run/rollback/refresh, journal table, DB-aware dialect.
-- Exit: up/down cycle tested on pg + mysql + sqlite.
+- [x] `NNN_name.sql` files with `-- DOWN` sections; version parsing + checksums.
+- [x] Journal table (dialect-aware), up/down runner, checksum + irreversible guards.
+- [x] Panel: dir picker, status list, run-all, rollback-last, create migration.
+- [x] 23 Rust (incl. live pg + mysql cycles) + 28 UI tests green, clippy clean.
+- Exit: up/down cycle tested on pg + mysql + sqlite. ✅
 
 ## Phase 7 — Database Designer
 

@@ -312,6 +312,108 @@ impl<S: CredentialStore> ConnectionManager<S> {
         let sql = crate::db::tabledata::insert_sql(engine, schema, table, &values);
         self.live_adapter(id)?.execute(&sql).await
     }
+
+    async fn ensure_journal(&self, id: &str) -> Result<(), FriendlyError> {
+        let engine = self.engine_of(id)?;
+        self.live_adapter(id)?.execute(&crate::migrations::journal_ddl(engine)).await?;
+        Ok(())
+    }
+
+    async fn applied_versions(&self, id: &str) -> Result<std::collections::HashMap<String, (String, String)>, FriendlyError> {
+        self.ensure_journal(id).await?;
+        let page = self
+            .live_adapter(id)?
+            .query(&format!("SELECT version, name, checksum FROM {}", crate::migrations::JOURNAL_TABLE))
+            .await?;
+        let mut map = std::collections::HashMap::new();
+        for row in page.rows {
+            let cells: Vec<String> = row.into_iter().map(|v| v.as_str().unwrap_or_default().to_string()).collect();
+            if cells.len() >= 3 {
+                map.insert(cells[0].clone(), (cells[1].clone(), cells[2].clone()));
+            }
+        }
+        Ok(map)
+    }
+
+    pub async fn migration_status(
+        &self,
+        id: &str,
+        files: Vec<crate::migrations::MigrationFile>,
+    ) -> Result<Vec<crate::migrations::MigrationState>, FriendlyError> {
+        let applied = self.applied_versions(id).await?;
+        Ok(files
+            .into_iter()
+            .map(|f| {
+                let (is_applied, ok) = match applied.get(&f.version) {
+                    Some((_, sum)) => (true, *sum == f.checksum),
+                    None => (false, true),
+                };
+                crate::migrations::MigrationState { version: f.version, name: f.name, applied: is_applied, checksum_ok: ok }
+            })
+            .collect())
+    }
+
+    async fn run_script(&self, id: &str, version: &str, script: &str) -> Result<(), FriendlyError> {
+        let adapter = self.live_adapter(id)?;
+        for stmt in crate::migrations::split_statements(script) {
+            adapter.execute(&stmt).await.map_err(|e| {
+                FriendlyError::new(
+                    &format!("Migration {version} failed."),
+                    &e.code,
+                    &[&e.title, "Fix the migration file — nothing was recorded as applied."],
+                )
+            })?;
+        }
+        Ok(())
+    }
+
+    pub async fn migrate_up(&self, id: &str, file: crate::migrations::MigrationFile) -> Result<(), FriendlyError> {
+        let applied = self.applied_versions(id).await?;
+        if let Some((_, sum)) = applied.get(&file.version) {
+            if *sum != file.checksum {
+                return Err(FriendlyError::new(
+                    &format!("Migration {} changed since it was applied.", file.version),
+                    "checksum-mismatch",
+                    &["The file no longer matches the applied checksum.", "Restore it or roll back first."],
+                ));
+            }
+            return Ok(());
+        }
+        self.run_script(id, &file.version, &file.up_sql).await?;
+        self.live_adapter(id)?
+            .execute(&format!(
+                "INSERT INTO {} (version, name, checksum) VALUES ('{}', '{}', '{}')",
+                crate::migrations::JOURNAL_TABLE,
+                file.version.replace('\'', "''"),
+                file.name.replace('\'', "''"),
+                file.checksum
+            ))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn migrate_down(&self, id: &str, file: crate::migrations::MigrationFile) -> Result<(), FriendlyError> {
+        let down = file.down_sql.as_deref().ok_or_else(|| {
+            FriendlyError::new(
+                &format!("Migration {} has no DOWN section.", file.version),
+                "irreversible",
+                &["Add a `-- DOWN` section to roll this migration back."],
+            )
+        })?;
+        let applied = self.applied_versions(id).await?;
+        if !applied.contains_key(&file.version) {
+            return Ok(());
+        }
+        self.run_script(id, &file.version, down).await?;
+        self.live_adapter(id)?
+            .execute(&format!(
+                "DELETE FROM {} WHERE version = '{}'",
+                crate::migrations::JOURNAL_TABLE,
+                file.version.replace('\'', "''")
+            ))
+            .await?;
+        Ok(())
+    }
 }
 
 pub type SharedManager<S = crate::security::AnyStore> = Arc<tokio::sync::Mutex<ConnectionManager<S>>>;
@@ -482,6 +584,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sqlite_migration_up_down_cycle_with_guards() {
+        use crate::migrations::parse_file;
+        let mut mgr = ConnectionManager::new(MemoryStore::new());
+        let profile = mgr.save_profile(sqlite_profile(":memory:"), "").expect("profile saves");
+        mgr.connect(&profile).await.unwrap();
+        let id = &profile.id;
+        let m1 = parse_file("001_users.sql", "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\n-- DOWN\nDROP TABLE users;").unwrap();
+        let m2 = parse_file("002_seed.sql", "INSERT INTO users (email) VALUES ('a@x.io');").unwrap();
+
+        let st = mgr.migration_status(id, vec![m1.clone(), m2.clone()]).await.unwrap();
+        assert!(st.iter().all(|s| !s.applied));
+
+        mgr.migrate_up(id, m1.clone()).await.unwrap();
+        mgr.migrate_up(id, m2.clone()).await.unwrap();
+        // Re-running applied migrations is a no-op, not an error.
+        mgr.migrate_up(id, m1.clone()).await.unwrap();
+        let st = mgr.migration_status(id, vec![m1.clone(), m2.clone()]).await.unwrap();
+        assert!(st.iter().all(|s| s.applied && s.checksum_ok));
+        let n = mgr.run_query(id, "SELECT COUNT(*) FROM users").await.unwrap();
+        assert_eq!(n.rows[0][0], serde_json::Value::from(1));
+
+        // Edited-after-apply is flagged and refuses to re-run.
+        let edited = parse_file("001_users.sql", "CREATE TABLE users (id TEXT);\n-- DOWN\nDROP TABLE users;").unwrap();
+        let st = mgr.migration_status(id, vec![edited]).await.unwrap();
+        assert!(!st[0].checksum_ok);
+
+        // Irreversible migration refuses rollback.
+        let err = mgr.migrate_down(id, m2.clone()).await.unwrap_err();
+        assert_eq!(err.code, "irreversible");
+
+        // Rollback drops the table and clears the journal row.
+        mgr.migrate_down(id, m1.clone()).await.unwrap();
+        let st = mgr.migration_status(id, vec![m1.clone()]).await.unwrap();
+        assert!(!st[0].applied);
+        assert!(mgr.run_query(id, "SELECT * FROM users").await.is_err());
+    }
+
+    #[tokio::test]
     async fn postgres_unreachable_is_friendly_without_server() {
         let mut mgr = ConnectionManager::new(MemoryStore::new());
         let profile = ConnectionProfile {
@@ -576,6 +716,14 @@ mod tests {
             assert_eq!(page.rows[0][1], serde_json::Value::from("a@x.io"));
             let bad = mgr.run_query(&profile.id, "SELECT nope FROM lumi_itest.users").await.unwrap_err();
             assert!(bad.title.contains("nope") || !bad.causes.is_empty(), "got: {bad:?}");
+            // Migration up/down round-trip on the live server.
+            let mig = crate::migrations::parse_file("090_lumi_itest.sql", "CREATE TABLE lumi_itest.mig (id BIGINT PRIMARY KEY);\n-- DOWN\nDROP TABLE lumi_itest.mig;").unwrap();
+            mgr.migrate_up(&profile.id, mig.clone()).await.unwrap();
+            let st = mgr.migration_status(&profile.id, vec![mig.clone()]).await.unwrap();
+            assert!(st[0].applied && st[0].checksum_ok);
+            mgr.migrate_down(&profile.id, mig).await.unwrap();
+            let st = mgr.migration_status(&profile.id, vec![crate::migrations::parse_file("090_lumi_itest.sql", "CREATE TABLE lumi_itest.mig (id BIGINT PRIMARY KEY);\n-- DOWN\nDROP TABLE lumi_itest.mig;").unwrap()]).await.unwrap();
+            assert!(!st[0].applied);
             mgr.execute(&profile.id, "DROP SCHEMA lumi_itest CASCADE").await.unwrap();
             mgr.disconnect(&profile.id).await;
             assert!(!mgr.is_live(&profile.id));
@@ -630,6 +778,11 @@ mod tests {
             let page = mgr.run_query(&profile.id, "SELECT id, email FROM lumi_users").await.unwrap();
             assert_eq!(page.rows.len(), 1);
             assert_eq!(page.rows[0][1], serde_json::Value::from("a@x.io"));
+            let mig = crate::migrations::parse_file("090_lumi_itest.sql", "CREATE TABLE lumi_mig (id BIGINT PRIMARY KEY);\n-- DOWN\nDROP TABLE lumi_mig;").unwrap();
+            mgr.migrate_up(&profile.id, mig.clone()).await.unwrap();
+            let st = mgr.migration_status(&profile.id, vec![mig.clone()]).await.unwrap();
+            assert!(st[0].applied && st[0].checksum_ok);
+            mgr.migrate_down(&profile.id, mig).await.unwrap();
             mgr.execute(&profile.id, "DROP TABLE lumi_orders").await.unwrap();
             mgr.execute(&profile.id, "DROP TABLE lumi_users").await.unwrap();
             mgr.disconnect(&profile.id).await;
