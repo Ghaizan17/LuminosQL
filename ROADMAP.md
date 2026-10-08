@@ -79,10 +79,13 @@ one is green.
 - [x] 24 Rust + 36 UI tests green, clippy clean.
 - Exit: cold-start project open restores tabs + connections (sans secrets). ✅
 
-## Phase 9 — Optional AI
+## Phase 9 — Optional AI ✅
 
-- Behind an `AiProvider` interface; offline-first stays fully functional.
-- Exit: works with no key configured (features disabled, app untouched).
+- [x] `AiProvider` seam (generate/explain/explain-error); offline rule-based provider.
+- [x] Ollama + OpenAI-compatible HTTP provider; key in OS keyring, never disk.
+- [x] Assistant dialog (palette), key management in Settings; off by default.
+- [x] 25 Rust + 41 UI tests green, clippy clean.
+- Exit: works with no key configured (features disabled, app untouched). ✅
 
 ## Phase 10 — Production Release
 

@@ -98,6 +98,9 @@ export interface Settings {
   pageSize: number;
   explainDiagnostics: boolean;
   safeMode: boolean;
+  aiProvider: "off" | "offline" | "ollama" | "openai";
+  aiBaseUrl: string;
+  aiModel: string;
 }
 
 const initial: ShellState = {
@@ -132,7 +135,7 @@ const initial: ShellState = {
   problems: {},
   results: {},
   history: [],
-  settings: { pageSize: 50, explainDiagnostics: true, safeMode: false },
+  settings: { pageSize: 50, explainDiagnostics: true, safeMode: false, aiProvider: "off", aiBaseUrl: "http://localhost:11434/v1", aiModel: "llama3" },
 };
 
 export type Action =

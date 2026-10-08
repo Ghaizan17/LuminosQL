@@ -19,6 +19,9 @@ export const COMMANDS: Command[] = [
   { id: "connect", title: "Create Database Connection", phase: "2", run: (d) => d({ type: "dialog-open", engine: "postgres" }) },
   { id: "run-query", title: "Run Query", phase: "4", run: () => window.dispatchEvent(new CustomEvent("luminos:run-query")), shortcut: "Ctrl+Enter" },
   { id: "format", title: "Format SQL", phase: "4", run: () => window.dispatchEvent(new CustomEvent("luminos:format-sql")) },
+  { id: "ai-generate", title: "AI: Generate SQL from description", phase: "9", run: () => window.dispatchEvent(new CustomEvent("luminos:ai-generate")) },
+  { id: "ai-explain", title: "AI: Explain current query", phase: "9", run: () => window.dispatchEvent(new CustomEvent("luminos:ai-explain")) },
+  { id: "ai-error", title: "AI: Explain last error", phase: "9", run: () => window.dispatchEvent(new CustomEvent("luminos:ai-error")) },
 ];
 
 function setThemeFromPalette() {

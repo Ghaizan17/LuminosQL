@@ -116,6 +116,15 @@ export const backend = {
   workspaceOpen(dir: string): Promise<string> {
     return invoke("workspace_open", { dir });
   },
+  aiKeySave(key: string): Promise<void> {
+    return invoke("ai_key_save", { key });
+  },
+  aiKeyGet(): Promise<string | null> {
+    return invoke("ai_key_get");
+  },
+  aiKeySaved(): Promise<boolean> {
+    return invoke("ai_key_saved");
+  },
 };
 
 export function toFriendlyError(e: unknown): FriendlyError {

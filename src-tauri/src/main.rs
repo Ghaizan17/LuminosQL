@@ -232,6 +232,21 @@ async fn workspace_open(dir: String) -> Result<String, String> {
     std::fs::read_to_string(std::path::Path::new(&dir).join(".database").join("config.json"))
         .map_err(|_| format!("No workspace found in '{dir}' (expected .database/config.json)."))
 }
+
+#[tauri::command]
+fn ai_key_save(state: State<'_, AppState>, key: String) -> Result<(), String> {
+    state.mgr.lock().map_err(|e| e.to_string())?.ai_key_save(&key)
+}
+
+#[tauri::command]
+fn ai_key_get(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    state.mgr.lock().map_err(|e| e.to_string())?.ai_key_get()
+}
+
+#[tauri::command]
+fn ai_key_saved(state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.mgr.lock().map_err(|e| e.to_string())?.ai_key_get()?.is_some())
+}
 #[tauri::command]
 async fn table_page(
     state: State<'_, AppState>,
@@ -307,8 +322,10 @@ fn main() {
             migrate_up,
             migrate_down,
             create_migration,
-            workspace_save,
             workspace_open,
+            ai_key_save,
+            ai_key_get,
+            ai_key_saved,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LuminosQL");

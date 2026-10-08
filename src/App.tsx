@@ -5,6 +5,7 @@ import { load as loadSettings, save as saveSettings } from "./dx/settings";
 import { DiagnosticsRunner } from "./editor/DiagnosticsRunner";
 import { ActivityBar } from "./shell/ActivityBar";
 import { BottomPanel } from "./shell/BottomPanel";
+import { AiAssistant } from "./shell/AiAssistant";
 import { CommandPalette } from "./shell/CommandPalette";
 import { ConnectionDialog } from "./shell/ConnectionDialog";
 import { EditorArea } from "./shell/EditorArea";
@@ -75,6 +76,7 @@ export function App() {
       <StatusBar />
       <CommandPalette />
       <ConnectionDialog />
+      <AiAssistant />
       <DiagnosticsRunner />
     </div>
   );

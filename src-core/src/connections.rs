@@ -421,6 +421,19 @@ impl ConnectionManager<crate::security::AnyStore> {
     pub fn store_os_backed(&self) -> bool {
         self.store.is_os_backed()
     }
+
+    /// Optional AI provider key. Same keyring rules as passwords: OS store
+    /// or session memory, never disk, never logs.
+    pub fn ai_key_save(&self, key: &str) -> Result<(), String> {
+        if key.is_empty() {
+            return self.store.delete_password(crate::security::AI_SERVICE, "api-key");
+        }
+        self.store.set_password(crate::security::AI_SERVICE, "api-key", key)
+    }
+
+    pub fn ai_key_get(&self) -> Result<Option<String>, String> {
+        self.store.get_password(crate::security::AI_SERVICE, "api-key")
+    }
 }
 
 pub fn new_id() -> String {
@@ -493,6 +506,16 @@ mod tests {
             .next()
             .and_then(|p| mgr.password_for(&p).ok());
         assert_eq!(got.as_deref(), Some("s3cret"));
+    }
+
+    #[test]
+    fn ai_key_round_trips_and_clears() {
+        let mgr = ConnectionManager::new(crate::security::AnyStore::Mem(MemoryStore::new()));
+        assert_eq!(mgr.ai_key_get().unwrap(), None);
+        mgr.ai_key_save("sk-test").unwrap();
+        assert_eq!(mgr.ai_key_get().unwrap().as_deref(), Some("sk-test"));
+        mgr.ai_key_save("").unwrap();
+        assert_eq!(mgr.ai_key_get().unwrap(), None);
     }
 
     #[tokio::test]

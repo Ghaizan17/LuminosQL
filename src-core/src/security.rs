@@ -13,6 +13,9 @@ pub fn is_destructive(sql: &str) -> bool {
         || s.starts_with("update")
 }
 
+/// Keyring service for the optional AI provider key (see connections AI methods).
+pub const AI_SERVICE: &str = "dev.luminosql.app.ai";
+
 /// Strip secret-looking fragments (`password=…`, `passwd=…`, `pwd=…`,
 /// `://user:pass@`) from text destined for logs, errors, or the UI.
 pub fn redact(text: &str) -> String {

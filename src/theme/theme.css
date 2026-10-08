@@ -198,4 +198,4 @@ input, textarea, select { font: inherit; color: var(--fg); background: var(--bg-
   padding: 3px 10px; border-radius: 4px; }
 .import-label { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
 .node.history { display: flex; gap: 6px; align-items: center; }
-.workspace-box input { width: 100%; margin: 2px 0 4px; padding: 4px 6px; border-radius: 4px; }
+.dialog label textarea { display: block; width: 100%; margin-top: 4px; padding: 6px 8px; border-radius: 4px; font: var(--mono); resize: vertical; }
