@@ -18,6 +18,6 @@
     "targets": "all",
     "category": "DeveloperTool",
     "linux": { "deb": {}, "rpm": {}, "appimage": {} },
-    "windows": { "nsis": {}, "msi": {} }
+    "windows": { "nsis": {} }
   }
 }
