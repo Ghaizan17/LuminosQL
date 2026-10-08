@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { toFriendlyError } from "../src/db/backend";
+import { blankProfile } from "../src/db/types";
 import { COMMANDS, filterCommands } from "../src/state/commands";
 import { keywordProvider } from "../src/sql/completion";
 import { reducer } from "../src/state/store";
@@ -15,6 +17,11 @@ const base: ShellState = {
   splitTabId: null,
   paletteOpen: false,
   status: { connection: "x", queryTime: "—", errors: 0 },
+  connections: [],
+  activeConnectionId: null,
+  lastServerInfo: null,
+  connDialog: null,
+  storeOsBacked: null,
 };
 
 describe("command palette", () => {
@@ -53,5 +60,49 @@ describe("shell reducer", () => {
     };
     const next = reducer(s, { type: "close-tab", id: "b" });
     expect(next.activeTabId).toBe("a");
+  });
+});
+
+describe("connection state", () => {
+  const view = (id: string, live: boolean) => ({
+    profile: { ...blankProfile("postgres"), id, name: id },
+    live,
+  });
+
+  it("going live updates status bar and clears on disconnect", () => {
+    const loaded = reducer(
+      base,
+      { type: "connections-loaded", views: [view("a", false)], storeOsBacked: true },
+    );
+    const live = reducer(
+      loaded,
+      { type: "connection-live", id: "a", info: { engine: "PostgreSQL", version: "18.6", latency_ms: 3 } },
+    );
+    expect(live.activeConnectionId).toBe("a");
+    expect(live.status.connection).toContain("a");
+    expect(live.status.connection).toContain("18.6");
+    const dead = reducer(live, { type: "connection-dead", id: "a" });
+    expect(dead.activeConnectionId).toBeNull();
+    expect(dead.status.connection).toBe("Not connected");
+  });
+
+  it("reloading drops a stale active connection", () => {
+    const s = reducer(
+      { ...base, activeConnectionId: "gone" },
+      { type: "connections-loaded", views: [view("b", true)], storeOsBacked: false },
+    );
+    expect(s.activeConnectionId).toBeNull();
+    expect(s.storeOsBacked).toBe(false);
+  });
+
+  it("blank profiles carry engine defaults", () => {
+    expect(blankProfile("postgres").port).toBe(5432);
+    expect(blankProfile("mysql").port).toBe(3306);
+    expect(blankProfile("sqlite").host).toBe("");
+  });
+
+  it("backend errors normalize to friendly shape", () => {
+    expect(toFriendlyError(new Error("nope")).title).toContain("nope");
+    expect(toFriendlyError('{"title":"X","causes":[],"code":"c"}').code).toBe("c");
   });
 });

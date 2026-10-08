@@ -1,7 +1,9 @@
 import { useEffect } from "react";
+import { backend, isDesktop } from "./db/backend";
 import { ActivityBar } from "./shell/ActivityBar";
 import { BottomPanel } from "./shell/BottomPanel";
 import { CommandPalette } from "./shell/CommandPalette";
+import { ConnectionDialog } from "./shell/ConnectionDialog";
 import { EditorArea } from "./shell/EditorArea";
 import { Sidebar } from "./shell/Sidebar";
 import { StatusBar } from "./shell/StatusBar";
@@ -14,6 +16,17 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = state.theme;
   }, [state.theme]);
+
+  // Pull saved connections once when running inside the desktop shell.
+  // Browser dev mode has no backend — the panel shows that explicitly.
+  useEffect(() => {
+    if (!isDesktop()) return;
+    backend
+      .listConnections()
+      .then((views) => backend.credentialStoreStatus().catch(() => null).then((storeOsBacked) => ({ views, storeOsBacked })))
+      .then(({ views, storeOsBacked }) => dispatch({ type: "connections-loaded", views, storeOsBacked }))
+      .catch(() => dispatch({ type: "connections-loaded", views: [], storeOsBacked: null }));
+  }, [dispatch]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -44,6 +57,7 @@ export function App() {
       <BottomPanel />
       <StatusBar />
       <CommandPalette />
+      <ConnectionDialog />
     </div>
   );
 }

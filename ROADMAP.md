@@ -10,19 +10,22 @@ one is green.
 - [x] Scaffold skeleton (`src/`, `src-tauri/`, `scripts/`).
 - Exit: docs committed, `npm run build` green without Rust installed.
 
-## Phase 1 — Desktop Shell (in progress)
+## Phase 1 — Desktop Shell ✅
 
-- [ ] App window + VS Code-like grid: activity bar, sidebar, editor tabs (+ split),
+- [x] App window + VS Code-like grid: activity bar, sidebar, editor tabs (+ split),
       bottom panel, status bar, command palette (`Ctrl+Shift+P`, `Ctrl+P`).
-- [ ] Dark default + light theme, settings + keyboard-shortcut scaffolding.
-- [ ] Unit tests: command registry, shortcut map, SQL keyword completer.
-- Exit: `npm run build` + `npm test` green; shell usable with no backend.
+- [x] Dark default + light theme, settings + keyboard-shortcut scaffolding.
+- [x] Unit tests: command registry, shortcut map, SQL keyword completer.
+- Exit: `npm run build` + `npm test` green; shell usable with no backend. ✅
 
-## Phase 2 — Database Connections
+## Phase 2 — Database Connections ✅
 
-- PostgreSQL, MySQL/MariaDB, SQLite via `DatabaseAdapter` trait.
-- Create/connect/disconnect/reconnect/delete; friendly connection errors.
-- Exit: integration tests against all three engines (containers for pg/mysql).
+- [x] PostgreSQL, MySQL/MariaDB, SQLite via `DatabaseAdapter` trait (`src-core/`).
+- [x] Create/connect/disconnect/reconnect/delete + friendly errors (causes, no secrets).
+- [x] OS keyring via `keyring` crate, session-memory fallback (never disk).
+- [x] Connection manager UI: sidebar panel, dialog, status-bar info.
+- [x] 11 Rust tests (incl. live pg 18 + MariaDB 11 integration) + 4 new UI tests, clippy clean.
+- Exit: `cargo test` + `npm test` + `npm run build` green. ✅
 
 ## Phase 3 — Database Explorer
 

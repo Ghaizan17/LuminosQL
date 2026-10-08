@@ -1,5 +1,6 @@
 node_modules/
 dist/
+src-core/target/
 src-tauri/target/
 *.AppImage
 *.deb

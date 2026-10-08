@@ -51,25 +51,29 @@ WebView (React+TS)  ◄── IPC (Tauri commands, allowlisted) ──►  Rust 
   SQLite via Rust (`rusqlite`), one file under the OS data dir. Secrets live ONLY
   in the OS keyring.
 
-## 3. Rust core layout (`src-tauri/src/`)
+## 3. Rust core layout (`src-core/`, tested without GUI deps)
 
 ```text
-main.rs            — entry, window, updater
-lib.rs             — command registration
-db/                — DatabaseAdapter trait + rows/pages/errors
-  adapter.rs         trait: connect, ping, list_schemas, list_tables,
-                     describe_table, run_query(page), cancel
-  postgres.rs · mysql.rs · sqlite.rs   (Phase 2; Phase 1: trait + mock only)
-pool/              — per-connection pool, execution registry
-migrations/        — ordered .sql runner + journal table (Phase 6)
-security/          — CredentialStore trait + Linux/Windows impls,
-                     destructive-query classifier, secret redaction
-meta/              — local SQLite store (history, settings, favorites)
+lib.rs             — crate root
+db/                — DatabaseAdapter trait + ServerInfo / FriendlyError
+  mod.rs             trait: connect, ping, disconnect, is_connected
+  postgres.rs · mysql.rs · sqlite.rs
+connections.rs     — ConnectionProfile + ConnectionManager + field validation
+security.rs        — CredentialStore (Keyring / Memory / AnyStore),
+                     is_destructive classifier, secret redaction
 ```
 
-`DatabaseAdapter` is `async`, object-safe, returns paged `RecordBatch`-style rows
-(`columns + Vec<JsonValue> + total_hint`). Engine-specific SQL stays inside the
-adapter; shared logic (pagination, cancel, error mapping) stays in `db/`.
+## 3b. Build-environment split (Phase 2 amendment)
+
+Machines without root cannot install WebKit/GTK headers, so the full Tauri
+bundle only compiles where those exist (CI, `scripts/build-*.sh`). Therefore:
+
+- `src-core/` (above) is where ALL backend logic lives.
+- `src-tauri/` holds only the Tauri entry + IPC delegation
+  (`create/connect/disconnect/delete/list_connections`, keyring status).
+
+Rule: no database, credential, or SQL logic in `src-tauri/` — only delegation
+to tested `src-core` functions.
 
 ## 4. Frontend layout (`src/`)
 
@@ -82,6 +86,7 @@ state/                   — store.tsx (context+reducer), commands.ts (palette r
                            shortcuts.ts, settings.ts
 editor/                  — EditorPane interface + PlainEditor (Phase 1).
                            MonacoEditor plugs the same interface in Phase 4.
+db/                      — types.ts (IPC mirrors), backend.ts (Tauri bridge)
 theme/                   — theme.css with [data-theme=dark|light] variables
 ```
 

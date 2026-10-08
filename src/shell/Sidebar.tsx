@@ -1,6 +1,7 @@
+import { ConnectionsPanel } from "./ConnectionsPanel";
 import { useStore } from "../state/store";
 
-/** Phase 1 placeholder tree. Phases 2–3 replace nodes with live schema data. */
+/** Explorer sidebar. Connections are live data (Phase 2); schema tree lands in Phase 3. */
 export function Sidebar() {
   const { state } = useStore();
   return (
@@ -8,11 +9,7 @@ export function Sidebar() {
       {state.activity === "explorer" && (
         <>
           <h3>Databases</h3>
-          <div className="tree">
-            <div className="node">▾ Local PostgreSQL <em style={{ color: "var(--muted)" }}>(Phase 2)</em></div>
-            <div className="node" style={{ paddingLeft: 20 }}>▸ postgres</div>
-            <div className="node" style={{ paddingLeft: 20 }}>▸ myapp_dev</div>
-          </div>
+          <ConnectionsPanel />
           <h3>Project</h3>
           <div className="tree">
             <div className="node">📁 migrations/ <em style={{ color: "var(--muted)" }}>(Phase 6)</em></div>
