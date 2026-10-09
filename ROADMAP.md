@@ -94,3 +94,20 @@ one is green.
 - [x] Release runbook, finished README, CHANGELOG, aligned 0.1.0 versions.
 - [x] `npm audit`: 2 low (transitive dompurify via monaco, no safe fix) — recorded.
 - Exit: tagged release builds on both platforms from clean runners. ✅ (CI-owned; runbook documents)
+
+## Phase 11 — Integrated Terminal & IPC Repair ✅
+
+- [x] Repair the Tauri v2 IPC bridge: the app called the v1 `window.__TAURI__`
+      global, which Tauri v2 does not inject, so **every** backend call failed
+      inside the packaged app. Now routed through `@tauri-apps/api` v2.
+- [x] Real pty terminal (`portable-pty`: forkpty / ConPTY) driven by xterm.js,
+      with resize, scrollback and clean exit propagation.
+- [x] Shell is spawned only when the Terminal tab is first opened, never at startup.
+- [x] `SECURITY.md` §4a records the command-execution surface this introduces.
+- [x] Tests mock the `@tauri-apps/api/core` module — no test may again assert
+      against a global the real shell does not provide.
+- Exit: `cargo test` (incl. a real pty round-trip) + `npm test` + `npm run build`
+      + `tauri build` green, and a human confirms in `npm run tauri dev` that
+      connections load and the shell runs. ✅ automated half — **human UI check
+      still outstanding**: the build host had no usable display, so the terminal
+      has never been seen rendered.
