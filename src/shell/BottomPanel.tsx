@@ -1,4 +1,8 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { backend, isDesktop } from "../db/backend";
+import type { TerminalSession } from "../db/types";
 import { useStore } from "../state/store";
+import { TerminalView } from "./TerminalView";
 
 function cell(v: unknown): string {
   if (v === null || v === undefined) return "NULL";
@@ -92,6 +96,55 @@ export function BottomPanel() {
     { id: "output" as const, label: "Results" },
     { id: "terminal" as const, label: "Terminal" },
   ];
+
+  // The PTY is owned here, not by TerminalView: hiding the panel only toggles a
+  // CSS class, so the shell survives tab switches and re-shows with its state.
+  const [session, setSession] = useState<TerminalSession | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const starting = useRef(false);
+
+  useEffect(() => {
+    if (!isDesktop() || state.bottomTab !== "terminal" || session || starting.current) return;
+    starting.current = true;
+    backend
+      .terminalOpen()
+      .then(setSession)
+      .catch((e: unknown) => setFailure(e instanceof Error ? e.message : String(e)))
+      .finally(() => {
+        starting.current = false;
+      });
+  }, [session, state.bottomTab]);
+
+  useEffect(() => {
+    if (!session) return;
+    return () => {
+      void backend.terminalClose(session.id);
+    };
+  }, [session]);
+
+  const onExit = useCallback(() => setSession(null), []);
+
+  const notice = (
+    <div style={{ color: "var(--muted)", fontSize: 11, paddingBottom: 2 }}>
+      Runs your OS shell with your own privileges and full local access — see SECURITY.md §4a.
+    </div>
+  );
+
+  const terminal = !isDesktop() ? (
+    <div>The terminal needs the desktop shell — start the app with `npm run tauri dev`, or install the released build.</div>
+  ) : failure ? (
+    <div className="result-error" role="alert">
+      Could not start a terminal: {failure}
+    </div>
+  ) : session ? (
+    <>
+      {notice}
+      <TerminalView key={session.id} sessionId={session.id} onExit={onExit} />
+    </>
+  ) : (
+    <div>Starting shell…</div>
+  );
+
   return (
     <div className="bottom">
       <div className="bottom-tabs">
@@ -105,10 +158,10 @@ export function BottomPanel() {
           </button>
         ))}
       </div>
-      <div className="bottom-body">
+      <div className="bottom-body" style={{ display: "flex", flexDirection: "column" }}>
         {state.bottomTab === "problems" && <Problems />}
         {state.bottomTab === "output" && <Results />}
-        {state.bottomTab === "terminal" && <div>$ integrated terminal arrives in Phase 8.</div>}
+        {state.bottomTab === "terminal" && terminal}
       </div>
     </div>
   );

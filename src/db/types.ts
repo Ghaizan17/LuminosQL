@@ -150,3 +150,12 @@ export function blankProfile(engine: Engine): ConnectionProfile {
     ssl: false,
   };
 }
+
+/** A live PTY owned by the desktop shell. `id` addresses every later call. */
+export interface TerminalSession {
+  id: string;
+  shell: string;
+  pid: number;
+  cols: number;
+  rows: number;
+}

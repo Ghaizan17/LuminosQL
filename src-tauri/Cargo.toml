@@ -11,4 +11,5 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+portable-pty = "0.9"
 luminosql-core = { path = "../src-core" }

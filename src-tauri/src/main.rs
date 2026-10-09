@@ -2,24 +2,21 @@
 //! all database, credential, and security logic lives in the core crate
 //! (tested with plain `cargo test`, no GUI dependencies).
 
+
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use luminosql_core::connections::{ConnectionManager, ConnectionProfile, SharedManager};
-use luminosql_core::db::{FriendlyError, ServerInfo};
+use luminosql_core::connections::{
+    ConnectionManager, ConnectionProfile, FriendlyError, ServerInfo,
+};
 use luminosql_core::security::AnyStore;
 use serde::Serialize;
-use std::sync::Arc;
+use std::sync::Mutex;
+\
+
 use tauri::State;
-use tokio::sync::Mutex;
 
 struct AppState {
-    /// `tokio::sync::Mutex` (via the core crate's `SharedManager` alias): the
-    /// guard is `Send`, so it may be held across the `.await` points of the
-    /// database commands, and locking is infallible, so the commands no
-    /// longer surface a "lock" error code. Commands serialise on this lock
-    /// exactly as they did on the previous `std::sync::Mutex` — only now
-    /// they wait instead of blocking a runtime worker thread.
-    mgr: SharedManager<AnyStore>,
+    mgr: Mutex<ConnectionManager<AnyStore>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -37,12 +34,16 @@ async fn create_connection(
     if profile.id.is_empty() {
         profile.id = luminosql_core::connections::new_id();
     }
-    state.mgr.lock().await.save_profile(profile, &password)
+    state
+        .mgr
+        .lock()
+        .map_err(|e| vec![e.to_string()])?
+        .save_profile(profile, &password)
 }
 
 #[tauri::command]
 async fn list_connections(state: State<'_, AppState>) -> Result<Vec<ConnectionView>, String> {
-    let mgr = state.mgr.lock().await;
+    let mgr = state.mgr.lock().map_err(|e| e.to_string())?;
     Ok(mgr
         .list_profiles()
         .into_iter()
@@ -50,36 +51,36 @@ async fn list_connections(state: State<'_, AppState>) -> Result<Vec<ConnectionVi
             let live = mgr.is_live(&profile.id);
             ConnectionView { profile, live }
         })
-        .collect())
+        .c\\\\\\\\\\\\\\\\\\\\\\\\\||||||||||||||||||||||||||||\\\\\\\ollect())
 }
 
 #[tauri::command]
 async fn connect(state: State<'_, AppState>, id: String) -> Result<ServerInfo, FriendlyError> {
     let profile = {
-        let mgr = state.mgr.lock().await;
+        let mgr = state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?;
         mgr.list_profiles().into_iter().find(|p| p.id == id).ok_or_else(|| {
             FriendlyError::new("Connection not found.", "not-found", &["It may have been deleted."])
         })?
     };
-    state.mgr.lock().await.connect(&profile).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.connect(&profile).await
 }
 
 #[tauri::command]
 async fn disconnect(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    state.mgr.lock().await.disconnect(&id).await;
+    state.mgr.lock().map_err(|e| e.to_string())?.disconnect(&id).await;
     Ok(())
 }
 
 #[tauri::command]
 async fn delete_connection(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    state.mgr.lock().await.delete_profile(&id).await;
+    state.mgr.lock().map_err(|e| e.to_string())?.delete_profile(&id).await;
     Ok(())
 }
 
 #[tauri::command]
-async fn credential_store_status(state: State<'_, AppState>) -> Result<bool, String> {
+fn credential_store_status(state: State<'_, AppState>) -> Result<bool, String> {
     // True = OS keyring; false = session-memory fallback (never disk).
-    Ok(state.mgr.lock().await.store_os_backed())
+    Ok(state.mgr.lock().map_err(|e| e.to_string())?.store_os_backed())
 }
 
 /// Pure classifier for the ⚠ Destructive Query modal — no backend needed.
@@ -93,7 +94,7 @@ async fn list_schemas(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Vec<luminosql_core::db::schema::SchemaInfo>, FriendlyError> {
-    state.mgr.lock().await.list_schemas(&id).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.list_schemas(&id).await
 }
 
 #[tauri::command]
@@ -102,7 +103,7 @@ async fn list_tables(
     id: String,
     schema: String,
 ) -> Result<Vec<luminosql_core::db::schema::TableInfo>, FriendlyError> {
-    state.mgr.lock().await.list_tables(&id, &schema).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.list_tables(&id, &schema).await
 }
 
 #[tauri::command]
@@ -112,7 +113,7 @@ async fn describe_table(
     schema: String,
     table: String,
 ) -> Result<luminosql_core::db::schema::TableDef, FriendlyError> {
-    state.mgr.lock().await.describe_table(&id, &schema, &table).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.describe_table(&id, &schema, &table).await
 }
 
 #[tauri::command]
@@ -121,7 +122,7 @@ async fn list_functions(
     id: String,
     schema: String,
 ) -> Result<Vec<luminosql_core::db::schema::FunctionInfo>, FriendlyError> {
-    state.mgr.lock().await.list_functions(&id, &schema).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.list_functions(&id, &schema).await
 }
 
 #[tauri::command]
@@ -131,12 +132,12 @@ async fn table_ddl(
     schema: String,
     table: String,
 ) -> Result<String, FriendlyError> {
-    state.mgr.lock().await.table_ddl(&id, &schema, &table).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.table_ddl(&id, &schema, &table).await
 }
 
 #[tauri::command]
 async fn execute_sql(state: State<'_, AppState>, id: String, sql: String) -> Result<u64, FriendlyError> {
-    state.mgr.lock().await.execute(&id, &sql).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.execute(&id, &sql).await
 }
 
 #[tauri::command]
@@ -145,7 +146,7 @@ async fn run_query(
     id: String,
     sql: String,
 ) -> Result<luminosql_core::db::query::QueryPage, FriendlyError> {
-    state.mgr.lock().await.run_query(&id, &sql).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.run_query(&id, &sql).await
 }
 
 fn read_migration_dir(dir: &str) -> Result<Vec<luminosql_core::migrations::MigrationFile>, String> {
@@ -178,7 +179,7 @@ async fn migration_status(
     dir: String,
 ) -> Result<Vec<luminosql_core::migrations::MigrationState>, FriendlyError> {
     let files = read_migration_dir(&dir).map_err(|e| FriendlyError::new(&e, "bad-dir", &[]))?;
-    state.mgr.lock().await.migration_status(&id, files).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.migration_status(&id, files).await
 }
 
 #[tauri::command]
@@ -188,7 +189,7 @@ async fn migrate_up(state: State<'_, AppState>, id: String, dir: String, version
         .into_iter()
         .find(|f| f.version == version)
         .ok_or_else(|| FriendlyError::new(&format!("Migration {version} not found."), "not-found", &[]))?;
-    state.mgr.lock().await.migrate_up(&id, file).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.migrate_up(&id, file).await
 }
 
 #[tauri::command]
@@ -198,7 +199,7 @@ async fn migrate_down(state: State<'_, AppState>, id: String, dir: String, versi
         .into_iter()
         .find(|f| f.version == version)
         .ok_or_else(|| FriendlyError::new(&format!("Migration {version} not found."), "not-found", &[]))?;
-    state.mgr.lock().await.migrate_down(&id, file).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.migrate_down(&id, file).await
 }
 
 #[tauri::command]
@@ -236,20 +237,19 @@ async fn workspace_open(dir: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn ai_key_save(state: State<'_, AppState>, key: String) -> Result<(), String> {
-    state.mgr.lock().await.ai_key_save(&key)
+fn ai_key_save(state: State<'_, AppState>, key: String) -> Result<(), String> {
+    state.mgr.lock().map_err(|e| e.to_string())?.ai_key_save(&key)
 }
 
 #[tauri::command]
-async fn ai_key_get(state: State<'_, AppState>) -> Result<Option<String>, String> {
-    state.mgr.lock().await.ai_key_get()
+fn ai_key_get(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    state.mgr.lock().map_err(|e| e.to_string())?.ai_key_get()
 }
 
 #[tauri::command]
-async fn ai_key_saved(state: State<'_, AppState>) -> Result<bool, String> {
-    Ok(state.mgr.lock().await.ai_key_get()?.is_some())
+fn ai_key_saved(state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.mgr.lock().map_err(|e| e.to_string())?.ai_key_get()?.is_some())
 }
-
 #[tauri::command]
 async fn table_page(
     state: State<'_, AppState>,
@@ -258,7 +258,7 @@ async fn table_page(
     table: String,
     opts: luminosql_core::db::tabledata::PageOpts,
 ) -> Result<luminosql_core::db::tabledata::TablePage, FriendlyError> {
-    state.mgr.lock().await.table_page(&id, &schema, &table, opts).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.table_page(&id, &schema, &table, opts).await
 }
 
 #[tauri::command]
@@ -271,7 +271,7 @@ async fn update_cell(
     column: String,
     value: Option<String>,
 ) -> Result<u64, FriendlyError> {
-    state.mgr.lock().await.update_cell(&id, &schema, &table, pk, &column, value).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.update_cell(&id, &schema, &table, pk, &column, value).await
 }
 
 #[tauri::command]
@@ -282,7 +282,7 @@ async fn delete_row(
     table: String,
     pk: Vec<(String, Option<String>)>,
 ) -> Result<u64, FriendlyError> {
-    state.mgr.lock().await.delete_row(&id, &schema, &table, pk).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.delete_row(&id, &schema, &table, pk).await
 }
 
 #[tauri::command]
@@ -293,13 +293,13 @@ async fn insert_row(
     table: String,
     values: Vec<(String, Option<String>)>,
 ) -> Result<u64, FriendlyError> {
-    state.mgr.lock().await.insert_row(&id, &schema, &table, values).await
+    state.mgr.lock().map_err(|e| FriendlyError::new("Internal lock error.", "lock", &[&e.to_string()]))?.insert_row(&id, &schema, &table, values).await
 }
 
 fn main() {
     tauri::Builder::default()
         .manage(AppState {
-            mgr: Arc::new(Mutex::new(ConnectionManager::new(AnyStore::auto()))),
+            mgr: Mutex::new(ConnectionManager::new(AnyStore::auto())),
         })
         .invoke_handler(tauri::generate_handler![
             create_connection,
@@ -325,7 +325,6 @@ fn main() {
             migrate_up,
             migrate_down,
             create_migration,
-            workspace_save,
             workspace_open,
             ai_key_save,
             ai_key_get,
