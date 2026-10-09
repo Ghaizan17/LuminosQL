@@ -2,6 +2,7 @@
  *  browser gets an explicit "desktop backend unavailable" error — never a
  *  fake connection.
  */
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   ConnectionProfile,
   ConnectionView,
@@ -16,28 +17,28 @@ import type {
   TableDef,
   TableInfo,
   TablePage,
+  TerminalSession,
 } from "./types";
-
-declare global {
-  interface Window {
-    __TAURI__?: { core: { invoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> } };
-  }
-}
 
 export class DesktopUnavailable extends Error {
   constructor() {
-    super("Desktop backend unavailable — run via the Tauri shell (Phase 2 needs `npm run tauri dev`).");
+    super(
+      "Desktop backend unavailable — this window has no LuminosQL backend. " +
+        "Start the app with `npm run tauri dev`, or install the released desktop build. " +
+        "(A plain browser cannot reach the database layer.)",
+    );
   }
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const tauri = window.__TAURI__;
-  if (!tauri) throw new DesktopUnavailable();
-  return tauri.core.invoke(cmd, args) as Promise<T>;
+/** Tauri v2 injects `__TAURI_INTERNALS__`; the v1-style `window.__TAURI__`
+ *  global does not exist unless `app.withGlobalTauri` is enabled. */
+export function isDesktop(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-export function isDesktop(): boolean {
-  return !!window.__TAURI__;
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isDesktop()) throw new DesktopUnavailable();
+  return tauriInvoke(cmd, args) as Promise<T>;
 }
 
 export const backend = {
@@ -124,6 +125,18 @@ export const backend = {
   },
   aiKeySaved(): Promise<boolean> {
     return invoke("ai_key_saved");
+  },
+  terminalOpen(cwd?: string): Promise<TerminalSession> {
+    return invoke("terminal_open", { cwd });
+  },
+  terminalWrite(id: string, data: string): Promise<void> {
+    return invoke("terminal_write", { id, data });
+  },
+  terminalResize(id: string, cols: number, rows: number): Promise<void> {
+    return invoke("terminal_resize", { id, cols, rows });
+  },
+  terminalClose(id: string): Promise<void> {
+    return invoke("terminal_close", { id });
   },
 };
 

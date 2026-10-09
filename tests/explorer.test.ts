@@ -27,10 +27,15 @@ const RESPONSES: Record<string, unknown> = {
   list_functions: [{ schema: "public", name: "total_sales", arguments: "", return_type: "numeric", language: "sql" }],
 };
 
+let invokeImpl: (cmd: string) => Promise<unknown> = async (cmd) => RESPONSES[cmd] ?? null;
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: (cmd: string) => invokeImpl(cmd) }));
+
+/** Tauri v2's marker. `invoke` is mocked above; this only satisfies the
+ *  desktop-availability guard in the real bridge. */
 function stubBackend() {
-  vi.stubGlobal("window", {
-    __TAURI__: { core: { invoke: async (cmd: string) => RESPONSES[cmd] ?? null } },
-  });
+  vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+  invokeImpl = async (cmd) => RESPONSES[cmd] ?? null;
 }
 
 const BASE: ShellState = {
@@ -114,9 +119,9 @@ describe("explorer loading flow", () => {
   });
 
   it("records backend failures on the node", async () => {
-    vi.stubGlobal("window", {
-      __TAURI__: { core: { invoke: async () => { throw { title: "Boom", causes: [], code: "x" }; } } },
-    });
+    invokeImpl = async () => {
+      throw { title: "Boom", causes: [], code: "x" };
+    };
     const s = await walk([{ node: node("conn:c1", "schemas") }]);
     expect(s.explorer["conn:c1"].status).toBe("error");
     expect(s.explorer["conn:c1"].error?.title).toBe("Boom");
