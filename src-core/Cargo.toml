@@ -1,6 +1,6 @@
 [package]
 name = "luminosql-core"
-version = "0.1.0"
+version = "0.1.3"
 edition = "2021"
 description = "Database abstraction core for LuminosQL (no GUI deps — testable with cargo alone)"
 

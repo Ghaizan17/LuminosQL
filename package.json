@@ -1,6 +1,6 @@
 {
   "name": "luminosql",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "private": true,
   "description": "Database IDE — VS Code-like IDE for database engineering",
   "type": "module",

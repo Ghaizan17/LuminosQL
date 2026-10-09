@@ -3,10 +3,11 @@
 All notable changes, newest first. Versions are aligned across `package.json`,
 `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-core/Cargo.toml`.
 
-## Unreleased — Phase 11
+## 0.1.3 — 2026-10-09
 
 Fixes the release-blocking defect where the desktop app could not reach its own
-backend, and adds a real integrated terminal.
+backend, and adds a real integrated terminal. Also aligns all four version
+files with the tag: 0.1.1 and 0.1.2 shipped binaries that reported 0.1.0.
 
 - **IPC bridge (critical):** the frontend invoked the Tauri v1 `window.__TAURI__`
   global, which Tauri v2 never injects unless `app.withGlobalTauri` is set. Every
@@ -22,6 +23,14 @@ backend, and adds a real integrated terminal.
 - `FriendlyError`/`ServerInfo` are imported from `db::`, their public home.
 - App state uses `tokio::sync::Mutex` (the core crate's `SharedManager`), so command
   futures are `Send` and no longer block a runtime worker while a query runs.
+- Optional pre-commit guard (`.githooks`) refuses Rust/TypeScript that does not build.
+
+### Known limitation
+
+The integrated terminal compiles and bundles on Linux and Windows, and its pty
+backend is covered by tests that spawn a real shell, but the rendered UI has
+not yet been exercised on a display. Confirm it locally (`npm run tauri dev`,
+open the Terminal tab) before relying on it.
 
 ## 0.1.0 — 2026-10-09
 
