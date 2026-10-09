@@ -19,6 +19,22 @@ npm run tauri build
 Windows: install Rust via `rustup-init.exe`, WebView2 SDK, then `npm run tauri build`.
 See `scripts/build-windows.ps1`.
 
+## Commit hook
+
+Optional pre-commit guard that refuses to commit Rust or TypeScript that does
+not build (`cargo check` + `tsc --noEmit`). It exists because a single
+mangled source file is cheap to catch locally and expensive to catch in CI.
+
+```sh
+git config core.hooksPath .githooks   # once per clone
+```
+
+Disable with `git config --unset core.hooksPath`, or bypass a single commit
+with `git commit --no-verify`.
+
+Do **not** add `cargo fmt --check`: this codebase is hand-formatted and
+rustfmt would rewrite ~140 hunks across `src-core` and `src-tauri`.
+
 ## Git workflow
 
 Conventional commits, one logical change each:

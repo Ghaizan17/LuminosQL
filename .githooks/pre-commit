@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+# Pre-commit guard: refuse to commit Rust/TypeScript that does not build.
+#
+# Enable once per clone:
+#     git config core.hooksPath .githooks
+#
+# A mangled source file (bad merge, bad paste, an agent's broken edit) is
+# cheap to catch here and expensive to catch in CI. Escape deliberately with
+# `git commit --no-verify` if you know what you are doing.
+
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+check_rust=$(printf '%s\n' "$staged" | grep -c '\.rs$')
+check_ts=$(printf '%s\n' "$staged" | grep -cE '\.(ts|tsx)$')
+
+status=0
+
+if [ "$check_rust" -gt 0 ]; then
+  echo "pre-commit: cargo check (src-tauri + src-core)"
+  cargo check --manifest-path src-tauri/Cargo.toml --quiet || status=1
+fi
+
+if [ "$check_ts" -gt 0 ]; then
+  echo "pre-commit: tsc --noEmit"
+  npx --no-install tsc --noEmit || status=1
+fi
+
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "pre-commit: commit refused, the staged code does not build."
+  echo "Fix it, or bypass deliberately with: git commit --no-verify"
+  exit 1
+fi
+
+exit 0
